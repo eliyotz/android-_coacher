@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Screen Time Coach</string>
+    <string name="accessibility_service_label">Screen Time Coach</string>
+    <string name="accessibility_service_description">Detects which app is in the foreground so the coach can intervene when you exceed your self-set limits. The service does not read screen content.</string>
+
+    <string name="notif_channel_tracker">Tracking</string>
+    <string name="notif_channel_intervention">Coach interventions</string>
+    <string name="notif_tracker_title">Screen Time Coach is tracking</string>
+    <string name="notif_tracker_text">Tap to open. You can stop tracking from Settings.</string>
+
+    <string name="nav_today">Today</string>
+    <string name="nav_insights">Insights</string>
+    <string name="nav_limits">Limits</string>
+    <string name="nav_settings">Settings</string>
+</resources>
