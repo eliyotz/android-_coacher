@@ -54,7 +54,11 @@ class OverlayManager @Inject constructor(
                 appLabel = appLabel,
                 usedMinutes = usedMinutes,
                 pauseSeconds = pauseSeconds,
-                onDismiss = { onDone() },
+                onContinue = { onDone() },
+                onSendHome = {
+                    onDone()
+                    sendHome()
+                },
             )
         }
     }

@@ -1,6 +1,12 @@
 package com.coach.screentime.intervention
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,10 +16,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -31,12 +40,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.coach.screentime.ai.NegotiationViewModel
 import dagger.hilt.android.EntryPointAccessors
-import kotlinx.coroutines.delay
 
 private val OverlayScrim = Color(0xCC0B1220)
 
@@ -54,41 +63,93 @@ internal fun MindfulnessPauseOverlay(
     appLabel: String,
     usedMinutes: Int,
     pauseSeconds: Int,
-    onDismiss: () -> Unit,
+    onContinue: () -> Unit,
+    onSendHome: () -> Unit,
 ) {
     OverlayBackdrop {
-        var elapsed by remember { mutableStateOf(0) }
-        LaunchedEffect(Unit) {
-            while (elapsed < pauseSeconds) {
-                delay(1000)
-                elapsed += 1
+        var isHolding by remember { mutableStateOf(false) }
+        val progress = remember { Animatable(0f) }
+
+        // While held, animate progress 0 → 1 over the remaining time.
+        // When released early, snap back to 0 over a short window so the user
+        // sees they have to start over.
+        LaunchedEffect(isHolding) {
+            if (isHolding) {
+                val remainingFraction = 1f - progress.value
+                val remainingMs = (remainingFraction * pauseSeconds * 1000).toInt().coerceAtLeast(50)
+                progress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = remainingMs, easing = LinearEasing),
+                )
+                if (progress.value >= 1f) {
+                    onContinue()
+                }
+            } else {
+                progress.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 250),
+                )
             }
-            onDismiss()
         }
+
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface,
             modifier = Modifier.padding(32.dp).widthIn(max = 360.dp)
         ) {
             Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Pause", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                Text("Hold to open", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "$appLabel — $usedMinutes min today",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(20.dp))
-                LinearProgressIndicator(
-                    progress = { (elapsed.toFloat() / pauseSeconds).coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Spacer(Modifier.height(24.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(140.dp)
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                isHolding = true
+                                waitForUpOrCancellation()
+                                isHolding = false
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        progress = { progress.value },
+                        modifier = Modifier.fillMaxSize(),
+                        strokeWidth = 8.dp,
+                    )
+                    Surface(
+                        shape = CircleShape,
+                        color = if (isHolding) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(108.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                "Hold",
+                                color = if (isHolding) MaterialTheme.colorScheme.onPrimary
+                                        else MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    "${pauseSeconds - elapsed}s — take a breath. Is this what you meant to open?",
+                    if (isHolding) "Keep holding…"
+                    else "Hold the circle for ${pauseSeconds}s to continue.\nIs this what you meant to open?",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
-                Spacer(Modifier.height(20.dp))
-                TextButton(onClick = onDismiss) { Text("Continue anyway") }
+                Spacer(Modifier.height(16.dp))
+                TextButton(onClick = onSendHome) { Text("Close app") }
             }
         }
     }
