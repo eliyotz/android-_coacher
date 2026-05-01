@@ -69,13 +69,14 @@ class TodayViewModel @Inject constructor(
         val flaggedOpens = flaggedRollups.sumOf { it.opensCount }
         val adherence = if (flaggedOpens > 0) healthyOpens.toFloat() / flaggedOpens else 1f
 
-        val byCategory = rollups.groupBy { appsByPkg[it.packageName]?.categoryId ?: "other" }
-            .mapValues { (_, rs) -> rs.sumOf { it.totalSec } }
+        val rollupsByCategory = rollups.groupBy { appsByPkg[it.packageName]?.categoryId ?: "other" }
         val categoryRows = categories.map { c ->
+            val rs = rollupsByCategory[c.id].orEmpty()
             CategoryRow(
                 id = c.id,
                 name = c.name,
-                minutes = (byCategory[c.id] ?: 0) / 60,
+                minutes = rs.sumOf { it.totalSec } / 60,
+                opens = rs.sumOf { it.opensCount },
                 capMinutes = c.dailyMinutesCap,
             )
         }.sortedByDescending { it.minutes }
@@ -112,5 +113,6 @@ data class CategoryRow(
     val id: String,
     val name: String,
     val minutes: Int,
+    val opens: Int,
     val capMinutes: Int?,
 )

@@ -57,7 +57,7 @@ fun TodayScreen(viewModel: TodayViewModel = hiltViewModel()) {
             items(state.categories.filter { it.minutes > 0 || it.capMinutes != null }) { c ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        UsageRow(label = c.name, minutes = c.minutes, opens = 0, capMinutes = c.capMinutes)
+                        UsageRow(label = c.name, minutes = c.minutes, opens = c.opens, capMinutes = c.capMinutes)
                     }
                 }
             }
