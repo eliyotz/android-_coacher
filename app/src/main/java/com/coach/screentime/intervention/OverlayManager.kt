@@ -11,11 +11,11 @@ import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
-import androidx.savedstate.ViewTreeSavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -168,8 +168,8 @@ internal class ComposeOverlay private constructor(
             val owner = OverlayLifecycleOwner()
             owner.created()
             val view = ComposeView(context)
-            ViewTreeLifecycleOwner.set(view, owner)
-            ViewTreeSavedStateRegistryOwner.set(view, owner)
+            view.setViewTreeLifecycleOwner(owner)
+            view.setViewTreeSavedStateRegistryOwner(owner)
             val overlay = ComposeOverlay(view, owner)
             view.setContent {
                 content { overlay.onDoneCallback?.invoke() }

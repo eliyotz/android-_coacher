@@ -16,3 +16,4 @@ local.properties
 gradle-app.setting
 !gradle-wrapper.jar
 .gradletasknamecache
+.claude/
