@@ -2,5 +2,20 @@
 # Get a key at https://aistudio.google.com — free tier covers normal usage.
 GEMINI_API_KEY=
 
+# OAuth client ID for the Google Tasks integration.
+# Setup:
+#   1. console.cloud.google.com → new project
+#   2. APIs & Services → Library → enable Tasks API
+#   3. Credentials → Create OAuth client → Android
+#      Package: com.coach.screentime  (or .debug for debug builds)
+#      SHA-1:   keytool -list -v -keystore ~/.android/debug.keystore \
+#               -alias androiddebugkey -storepass android -keypass android
+#   4. OAuth consent screen → External, Testing → add yourself as test user.
+#      Add scope https://www.googleapis.com/auth/tasks.readonly
+#   5. ALSO create a "Web application" OAuth client (no SHA-1 needed) — used as
+#      the requestServerAuthCode target. Paste THAT client's ID here.
+# If left blank, the Tasks integration silently no-ops; the rest of the app still works.
+GOOGLE_OAUTH_CLIENT_ID=
+
 # Path to your Android SDK (Android Studio sets this automatically).
 # sdk.dir=/Users/you/Library/Android/sdk

@@ -25,6 +25,22 @@ class WorkScheduler @Inject constructor(
         scheduleServiceWatchdog()
         scheduleNudges()
         scheduleMorningReflection()
+        scheduleTaskCheck()
+    }
+
+    private fun scheduleTaskCheck() {
+        val req = PeriodicWorkRequestBuilder<TaskCheckWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "task_check",
+            ExistingPeriodicWorkPolicy.KEEP,
+            req,
+        )
     }
 
     private fun scheduleWeeklyReport() {

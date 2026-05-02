@@ -13,6 +13,7 @@ val localProps = Properties().apply {
     if (f.exists()) load(f.inputStream())
 }
 val geminiKey: String = (localProps.getProperty("GEMINI_API_KEY") ?: "").trim()
+val googleOAuthClientId: String = (localProps.getProperty("GOOGLE_OAUTH_CLIENT_ID") ?: "").trim()
 
 android {
     namespace = "com.coach.screentime"
@@ -26,6 +27,7 @@ android {
         versionName = "0.1.0"
 
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
+        buildConfigField("String", "GOOGLE_OAUTH_CLIENT_ID", "\"$googleOAuthClientId\"")
     }
 
     buildTypes {
@@ -86,6 +88,9 @@ dependencies {
     implementation(libs.moshi.kotlin)
 
     implementation(libs.kotlinx.coroutines.android)
+
+    implementation(libs.play.services.auth)
+    implementation(libs.androidx.security.crypto)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 

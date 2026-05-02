@@ -132,3 +132,62 @@ data class GoalRevisionEntity(
     val resolvedGoal: String?,
     val resolvedAt: Long?,
 )
+
+/** Local mirror of a Google Tasks task. Authoritative copy is in Google's API. */
+@Entity(
+    tableName = "tasks_mirror",
+    indices = [Index("dueDateMs"), Index("completed")]
+)
+data class TaskEntity(
+    @PrimaryKey val googleId: String,
+    val listId: String,
+    val title: String,
+    val notes: String,
+    val dueDateMs: Long?,
+    val completed: Boolean,
+    val etag: String,
+    val fetchedAt: Long,
+)
+
+@Entity(tableName = "task_states")
+data class TaskStateEntity(
+    @PrimaryKey val googleId: String,
+    val state: String, // untouched | prompted | working | delayed | dismissed_pending | judged_done
+    val lastPromptedAt: Long,
+    val workingSinceAt: Long,
+    val delayedUntilMs: Long,
+    val lastJudgmentTs: Long,
+    val silenceCheckedAt: Long, // last time silence was evaluated; 0 if never
+)
+
+@Entity(
+    tableName = "task_delays",
+    indices = [Index("googleId"), Index("ts")]
+)
+data class TaskDelayEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val googleId: String,
+    val ts: Long,
+    val requestedDelayMs: Long,
+    val granted: Boolean,
+    val reason: String,
+    val aiExplanation: String,
+)
+
+@Entity(
+    tableName = "punishments",
+    indices = [Index("expiresAt"), Index("decidedAt")]
+)
+data class PunishmentEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val decidedAt: Long,
+    val source: String, // "task" | "manual"
+    val taskGoogleId: String?,
+    val expiresAt: Long,
+    val blockedPackagesJson: String, // JSON array of package names
+    val capReductionPct: Int,
+    val focusMinutes: Int,
+    val mindfulPauseMultiplier: Float,
+    val rationale: String,
+    val severity: String, // "light" | "medium" | "harsh"
+)

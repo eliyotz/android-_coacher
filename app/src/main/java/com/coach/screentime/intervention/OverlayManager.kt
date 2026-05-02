@@ -117,6 +117,29 @@ class OverlayManager @Inject constructor(
     }
 
     @Synchronized
+    fun showTaskCheck(
+        taskId: String,
+        onSubmit: (reason: String) -> Unit,
+    ) {
+        if (!hasOverlayPermission()) {
+            // No overlay permission means we can't ask in-app; AI still escalates via the worker.
+            return
+        }
+        show { onDone ->
+            TaskCheckReasonOverlay(
+                onSubmit = { reason ->
+                    onSubmit(reason)
+                    onDone()
+                },
+                onCancel = {
+                    onDone()
+                    sendHome()
+                },
+            )
+        }
+    }
+
+    @Synchronized
     fun dismiss() {
         current?.let { runCatching { wm.removeView(it.view) } }
         current = null

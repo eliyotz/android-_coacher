@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coach.screentime.data.db.dao.AppDao
 import com.coach.screentime.data.db.dao.CategoryDao
+import com.coach.screentime.data.db.dao.PunishmentDao
 import com.coach.screentime.data.db.dao.RollupDao
 import com.coach.screentime.data.db.dao.SessionDao
 import com.coach.screentime.data.db.entities.AppEntity
 import com.coach.screentime.data.db.entities.CategoryEntity
 import com.coach.screentime.data.db.entities.DailyRollupEntity
+import com.coach.screentime.data.db.entities.PunishmentEntity
 import com.coach.screentime.insights.StreakCalculator
 import com.coach.screentime.util.Time
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -30,6 +32,7 @@ class TodayViewModel @Inject constructor(
     private val appDao: AppDao,
     private val categoryDao: CategoryDao,
     private val sessionDao: SessionDao,
+    private val punishmentDao: PunishmentDao,
     private val streakCalculator: StreakCalculator,
 ) : ViewModel() {
 
@@ -88,6 +91,7 @@ class TodayViewModel @Inject constructor(
 
         val streak = streakCalculator.current()
         val worstHourLabel = computeWorstHour()
+        val activePunishment = punishmentDao.activeSnapshot(System.currentTimeMillis()).firstOrNull()
         val sevenDayAvgMinByPkg = sevenDayAverages(rows.map { it.packageName })
         val rowsWithDelta = rows.map { r ->
             val avg = sevenDayAvgMinByPkg[r.packageName] ?: 0
@@ -103,6 +107,7 @@ class TodayViewModel @Inject constructor(
             categories = categoryRows,
             streak = streak,
             worstHourLabel = worstHourLabel,
+            activePunishment = activePunishment,
         )
     }
 
@@ -145,6 +150,7 @@ data class TodayUiState(
     val categories: List<CategoryRow>,
     val streak: Int = 0,
     val worstHourLabel: String? = null,
+    val activePunishment: PunishmentEntity? = null,
 ) {
     companion object { val Empty = TodayUiState(0, 0, 1f, emptyList(), emptyList()) }
 }

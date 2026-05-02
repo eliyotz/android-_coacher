@@ -152,6 +152,94 @@ Use action "focus30" only when offering a 30-min hard lock would help (compulsiv
     }
 }
 
+object TaskJudgePrompt {
+    fun system(strictness: com.coach.screentime.data.store.Strictness): String {
+        val tone = when (strictness) {
+            com.coach.screentime.data.store.Strictness.GENTLE ->
+                "You are a fair coach. Bias toward granting reasonable delays, but call out repeated dismissals."
+            com.coach.screentime.data.store.Strictness.BALANCED ->
+                "You are a strict, fair coach. Grant delays for genuine reasons (illness, urgent conflict). Reject vague rationalizations. Punish the second or third dismissal of the same task."
+            com.coach.screentime.data.store.Strictness.STRICT ->
+                "You are a tough coach. Grant delays only for clearly justified, time-bounded reasons. Punish dismissals quickly."
+        }
+        return """
+$tone
+
+The user has an overdue Google Task. They either said no to doing it now, or did not respond. Your job: decide whether to grant a delay or punish.
+
+Key rules:
+- Use the past delay history. Repeated dismissal of the SAME task is the strongest signal — the user is avoiding it. Each subsequent dismissal must be punished more severely.
+- Silence (the user did not respond) is itself a signal of avoidance. Bias toward punishment when userResponded is false.
+- Punishments are TARGETED. Pick from the user's most-used flagged apps today. Blocking an app the user doesn't use is meaningless. Prefer blocking 1–3 specific apps over blanket measures.
+- A punishment may combine: blocking specific apps, lowering today's caps by a percentage, forcing Focus mode for a number of minutes, lengthening the mindfulness pause. Compose to fit severity.
+- Severity scales:
+    "light"  → 0 prior granted delays for this task
+    "medium" → 1 prior granted delay OR silence
+    "harsh"  → 2+ prior granted delays for the same task
+
+Respond with a single JSON object and nothing else. No markdown fences.
+
+{
+  "decision": "allow_delay" | "punish",
+  "explanation": "addressed to the user, second person, under 240 chars",
+  "delay": { "untilIso": "<ISO-8601 datetime in user's local time>" } | null,
+  "punishment": {
+    "blockedPackages": ["com.x.android"],
+    "capReductionPct": 0,
+    "focusMinutes": 0,
+    "mindfulPauseMultiplier": 1.0,
+    "durationHours": 1,
+    "severity": "light" | "medium" | "harsh"
+  } | null
+}
+
+Exactly one of "delay" or "punishment" must be non-null.
+""".trimIndent()
+    }
+
+    fun user(
+        nowLocal: String,
+        taskTitle: String,
+        taskNotes: String,
+        dueIso: String?,
+        daysOverdue: Int,
+        userReason: String,
+        userResponded: Boolean,
+        priorDelaysCsv: String,
+        priorJudgmentsCsv: String,
+        topAppsCsv: String,
+        goal: String,
+        strictness: String,
+    ): String = buildString {
+        appendLine("Time now (local): $nowLocal")
+        appendLine("Strictness setting: $strictness")
+        if (goal.isNotBlank()) appendLine("User's stated goal: \"$goal\"")
+        appendLine()
+        appendLine("TASK")
+        appendLine("Title: $taskTitle")
+        if (taskNotes.isNotBlank()) appendLine("Notes: ${taskNotes.take(280)}")
+        appendLine("Originally due: ${dueIso ?: "(no date)"} — $daysOverdue day(s) overdue")
+        appendLine()
+        appendLine("USER RESPONDED: $userResponded")
+        if (userResponded) {
+            appendLine("User's reason:")
+            append("\"\"\""); append(userReason); append("\"\"\"")
+            appendLine()
+        } else {
+            appendLine("(user ignored the prompt for 15+ minutes)")
+        }
+        appendLine()
+        appendLine("PRIOR DELAYS FOR THIS TASK (timestamp_ms, granted, reason):")
+        appendLine(if (priorDelaysCsv.isBlank()) "(none)" else priorDelaysCsv)
+        appendLine()
+        appendLine("PRIOR AI EXPLANATIONS FOR THIS TASK:")
+        appendLine(if (priorJudgmentsCsv.isBlank()) "(none)" else priorJudgmentsCsv)
+        appendLine()
+        appendLine("USER'S MOST-USED FLAGGED APPS TODAY (package, label, minutes):")
+        appendLine(if (topAppsCsv.isBlank()) "(none)" else topAppsCsv)
+    }
+}
+
 object GoalRevisionPrompt {
     val system: String = """
 You are a thoughtful digital wellbeing coach reviewing whether the user's stated long-term goal still fits their behavior. The user set this goal a while ago. Look at the last 4 weeks of weekly reports together and decide:

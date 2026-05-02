@@ -144,7 +144,97 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             }
         }
 
+        GoogleTasksCard(viewModel)
         ExportCard(viewModel)
+    }
+}
+
+@Composable
+private fun GoogleTasksCard(viewModel: SettingsViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val connection by viewModel.googleConnection.collectAsState()
+    val activity = context as? android.app.Activity
+
+    val signInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK && activity != null) {
+            val data = result.data
+            try {
+                val authResult = com.google.android.gms.auth.api.identity.Identity
+                    .getAuthorizationClient(activity)
+                    .getAuthorizationResultFromIntent(data)
+                val code = authResult.serverAuthCode
+                val email = null as String?
+                if (!code.isNullOrBlank()) {
+                    viewModel.onGoogleSignedIn(code, email)
+                }
+            } catch (_: com.google.android.gms.common.api.ApiException) {
+                // User cancelled or no consent — ignore.
+            }
+        }
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Google Tasks", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "When connected, the coach reads your overdue tasks and prompts you to do them. Saying no or ignoring the prompt summons the AI — it can grant a delay or punish.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            when {
+                !connection.configured -> Text(
+                    "Set GOOGLE_OAUTH_CLIENT_ID in local.properties and rebuild.",
+                    color = MaterialTheme.colorScheme.error,
+                    fontSize = 12.sp,
+                )
+                connection.connected -> {
+                    Text(
+                        "Connected${connection.email?.let { " as $it" } ?: ""}.",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 12.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { viewModel.disconnectGoogle() },
+                    ) { Text("Disconnect") }
+                }
+                else -> {
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            if (activity == null) return@Button
+                            val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
+                                .setRequestedScopes(
+                                    listOf(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/tasks.readonly"))
+                                )
+                                .requestOfflineAccess(com.coach.screentime.BuildConfig.GOOGLE_OAUTH_CLIENT_ID, /* forceCodeForRefreshToken= */ true)
+                                .build()
+                            com.google.android.gms.auth.api.identity.Identity
+                                .getAuthorizationClient(activity)
+                                .authorize(request)
+                                .addOnSuccessListener { result ->
+                                    if (result.hasResolution()) {
+                                        val sender = result.pendingIntent?.intentSender
+                                        if (sender != null) {
+                                            signInLauncher.launch(
+                                                androidx.activity.result.IntentSenderRequest.Builder(sender).build()
+                                            )
+                                        }
+                                    } else {
+                                        // Already authorized — pull serverAuthCode directly.
+                                        result.serverAuthCode?.let {
+                                            viewModel.onGoogleSignedIn(it, null)
+                                        }
+                                    }
+                                }
+                        },
+                    ) { Text("Connect Google Tasks") }
+                }
+            }
+        }
     }
 }
 

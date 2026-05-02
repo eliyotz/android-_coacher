@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.coach.screentime.ui.components.AdherenceRing
+import com.coach.screentime.ui.components.PunishmentBanner
 import com.coach.screentime.ui.components.UsageRow
 
 @Composable
@@ -39,6 +40,9 @@ fun TodayScreen(viewModel: TodayViewModel = hiltViewModel()) {
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        state.activePunishment?.let { p ->
+            item { PunishmentBanner(p) }
+        }
         item {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(

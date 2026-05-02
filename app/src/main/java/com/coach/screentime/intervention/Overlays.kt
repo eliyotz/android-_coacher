@@ -298,6 +298,51 @@ internal sealed interface NegotiationState {
     data class Decided(val verdict: NegotiationViewModel.Verdict) : NegotiationState
 }
 
+@Composable
+internal fun TaskCheckReasonOverlay(
+    onSubmit: (reason: String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    OverlayBackdrop {
+        var reason by remember { mutableStateOf("") }
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.padding(32.dp).widthIn(max = 420.dp)
+        ) {
+            Column(Modifier.padding(24.dp)) {
+                Text("Why aren't you doing it?", fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "The coach will decide whether to grant a delay or take action. Be honest — repeated dismissals stack up.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = reason,
+                    onValueChange = { reason = it.take(500) },
+                    label = { Text("Your reason") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 6,
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Cancel") }
+                    Button(
+                        onClick = { onSubmit(reason.trim()) },
+                        enabled = reason.isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                    ) { Text("Send to coach") }
+                }
+            }
+        }
+    }
+}
+
 @dagger.hilt.EntryPoint
 @dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
 internal interface NegotiationOverlayEntryPoint {

@@ -2,6 +2,7 @@ package com.coach.screentime.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
@@ -21,10 +22,12 @@ import androidx.navigation.compose.rememberNavController
 import com.coach.screentime.ui.insights.InsightsScreen
 import com.coach.screentime.ui.limits.LimitsScreen
 import com.coach.screentime.ui.settings.SettingsScreen
+import com.coach.screentime.ui.tasks.TasksScreen
 import com.coach.screentime.ui.today.TodayScreen
 
 private enum class Tab(val route: String, val label: String) {
     Today("today", "Today"),
+    Tasks("tasks", "Tasks"),
     Insights("insights", "Insights"),
     Limits("limits", "Limits"),
     Settings("settings", "Settings"),
@@ -64,6 +67,7 @@ fun MainNavigation() {
             modifier = Modifier.padding(padding),
         ) {
             composable(Tab.Today.route) { TodayScreen() }
+            composable(Tab.Tasks.route) { TasksScreen() }
             composable(Tab.Insights.route) { InsightsScreen() }
             composable(Tab.Limits.route) { LimitsScreen() }
             composable(Tab.Settings.route) { SettingsScreen() }
@@ -74,6 +78,7 @@ fun MainNavigation() {
 @Composable
 private fun iconFor(t: Tab) = when (t) {
     Tab.Today -> Icons.Filled.Today
+    Tab.Tasks -> Icons.Filled.CheckCircle
     Tab.Insights -> Icons.Filled.Insights
     Tab.Limits -> Icons.Filled.Schedule
     Tab.Settings -> Icons.Filled.Settings

@@ -8,13 +8,16 @@ import com.coach.screentime.data.db.entities.GoalEntity
 import com.coach.screentime.data.store.Mode
 import com.coach.screentime.data.store.SettingsStore
 import com.coach.screentime.data.store.Strictness
+import com.coach.screentime.auth.GoogleAuthRepository
 import com.coach.screentime.export.JsonExporter
+import com.coach.screentime.tasks.TasksRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -24,7 +27,36 @@ class SettingsViewModel @Inject constructor(
     private val settingsStore: SettingsStore,
     private val goalDao: GoalDao,
     private val jsonExporter: JsonExporter,
+    private val authRepo: GoogleAuthRepository,
+    private val tasksRepo: TasksRepository,
 ) : ViewModel() {
+
+    private val _googleConnectionTick = MutableStateFlow(0)
+    val googleConnection: StateFlow<GoogleConnection> = _googleConnectionTick.map {
+        GoogleConnection(
+            configured = authRepo.isOAuthConfigured(),
+            connected = authRepo.isConnected,
+            email = authRepo.accountEmail,
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, GoogleConnection(false, false, null))
+
+    fun onGoogleSignedIn(serverAuthCode: String, email: String?) {
+        viewModelScope.launch {
+            val result = authRepo.completeSignIn(serverAuthCode, email)
+            if (result.isSuccess) {
+                tasksRepo.sync()
+            }
+            _googleConnectionTick.value = _googleConnectionTick.value + 1
+        }
+    }
+
+    fun disconnectGoogle() {
+        viewModelScope.launch {
+            tasksRepo.signOut()
+            tasksRepo.clearMirror()
+            _googleConnectionTick.value = _googleConnectionTick.value + 1
+        }
+    }
 
     val state: StateFlow<SettingsUiState> = combine(
         settingsStore.strictness,
@@ -82,3 +114,9 @@ sealed interface ExportStatus {
     data class Done(val byteCount: Long) : ExportStatus
     data class Failed(val message: String) : ExportStatus
 }
+
+data class GoogleConnection(
+    val configured: Boolean,
+    val connected: Boolean,
+    val email: String?,
+)

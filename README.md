@@ -111,6 +111,21 @@ The Gemini key powers four distinct prompts (see `app/src/main/java/com/coach/sc
 
 ---
 
+## Google Tasks integration (optional)
+
+The app can read your Google Tasks and demand answers when something is overdue. Saying no or ignoring the prompt summons the AI, which can grant a delay (with memory of past delays) or punish — block specific apps, lower today's caps, force Focus mode. Setup:
+
+1. `console.cloud.google.com` → new project (or reuse existing).
+2. APIs & Services → Library → enable **Tasks API**.
+3. OAuth consent screen → External, Testing → add yourself as test user. Add scope `https://www.googleapis.com/auth/tasks.readonly`.
+4. Credentials → Create OAuth client → **Android**:
+   - Package: `com.coach.screentime` (or `.debug`)
+   - SHA-1: `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android`
+5. Credentials → Create another OAuth client → **Web application** (no redirect URI needed). Use this Web client's ID for `requestServerAuthCode`.
+6. Copy the **Web client ID** into `local.properties` as `GOOGLE_OAUTH_CLIENT_ID=...` and rebuild.
+
+Open the app → Settings → "Connect Google Tasks". The integration silently no-ops if `GOOGLE_OAUTH_CLIENT_ID` is blank.
+
 ## License
 
 Personal use. Not for redistribution — the API key is bundled in the APK.

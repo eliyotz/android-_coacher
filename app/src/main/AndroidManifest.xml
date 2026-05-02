@@ -99,6 +99,24 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".enforcement.TaskCheckActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.coach.screentime.tasks.YES" />
+                <action android:name="com.coach.screentime.tasks.NO" />
+                <action android:name="com.coach.screentime.tasks.REASON" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".work.TaskUnlockReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".focus.FocusModeTileService"
             android:exported="true"

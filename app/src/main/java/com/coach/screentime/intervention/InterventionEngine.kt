@@ -18,6 +18,7 @@ import com.coach.screentime.data.store.Mode
 import com.coach.screentime.data.store.SettingsStore
 import com.coach.screentime.focus.FocusActionReceiver
 import com.coach.screentime.focus.FocusManager
+import com.coach.screentime.punishment.PunishmentManager
 import com.coach.screentime.tracking.NotifChannels
 import com.coach.screentime.tracking.SessionAggregator
 import com.coach.screentime.util.Time
@@ -48,6 +49,7 @@ class InterventionEngine @Inject constructor(
     private val overlayManager: OverlayManager,
     private val appRegistry: AppRegistry,
     private val focusManager: FocusManager,
+    private val punishmentManager: PunishmentManager,
 ) {
     private val recentExtensions = mutableMapOf<String, Long>() // pkg -> expiresAt
     private val recentSoftNotifs = mutableMapOf<String, String>() // pkg -> dateLocal soft already fired
@@ -67,6 +69,18 @@ class InterventionEngine @Inject constructor(
         val settings = settingsStore.snapshot()
         if (settings.mode == Mode.OBSERVE) return
 
+        val now = System.currentTimeMillis()
+
+        // Punishments take precedence over everything except focus mode. The AI
+        // can target any app, even one the user hasn't individually flagged.
+        val activeBlock = punishmentManager.isAppBlocked(packageName, now)
+        if (activeBlock != null) {
+            val mins = ((activeBlock.punishment.expiresAt - now) / 60_000L).coerceAtLeast(0L).toInt()
+            log(packageName, "punishment", "blocked", "ai", "${mins}m")
+            overlayManager.showHardLock(packageName, app.displayName)
+            return
+        }
+
         val category = categoryDao.byId(app.categoryId)
         val categoryCapMin = category?.dailyMinutesCap
 
@@ -76,7 +90,7 @@ class InterventionEngine @Inject constructor(
         if (!app.isFlagged && categoryCapMin == null) return
 
         // Focus mode: hard-lock every flagged app for the duration, no negotiation.
-        if (focusManager.isActive(System.currentTimeMillis())) {
+        if (focusManager.isActive(now)) {
             log(packageName, "hardlock", "blocked", "focus", "active")
             overlayManager.showHardLock(packageName, app.displayName)
             return
@@ -84,8 +98,12 @@ class InterventionEngine @Inject constructor(
 
         val today = Time.todayString()
         val usedSec = rollupDao.totalSecondsForPackage(today, packageName)
-        val perAppCapMin = app.perAppDailyMinutesCap
-        val catUsedSec = if (categoryCapMin != null) categoryUsedSec(today, app.categoryId) else 0
+
+        // Active punishment can shrink today's caps by a percentage.
+        val capReductionPct = punishmentManager.capReductionPct(now)
+        val perAppCapMin = app.perAppDailyMinutesCap?.let { applyReduction(it, capReductionPct) }
+        val effectiveCategoryCapMin = categoryCapMin?.let { applyReduction(it, capReductionPct) }
+        val catUsedSec = if (effectiveCategoryCapMin != null) categoryUsedSec(today, app.categoryId) else 0
 
         // Layer 3: hard lock — including the 24h cool-off when the user has tried to disable it.
         val hardLockEffective = isHardLockEffective(app)
@@ -97,18 +115,18 @@ class InterventionEngine @Inject constructor(
 
         // Honor outstanding extension grants.
         val extUntil = recentExtensions[packageName] ?: 0L
-        val now = System.currentTimeMillis()
+        val pauseMultiplier = punishmentManager.mindfulPauseMultiplier(now)
         if (extUntil > now) {
-            maybeMindfulnessPause(app, usedSec, perAppCapMin, settings.mindfulPauseSec, escalated = false)
+            maybeMindfulnessPause(app, usedSec, perAppCapMin, settings.mindfulPauseSec, escalated = false, multiplier = pauseMultiplier)
             return
         }
 
         // Layer 2: limit crossed → negotiate.
         val perAppOver = perAppCapMin != null && usedSec >= perAppCapMin * 60
-        val categoryOver = categoryCapMin != null && catUsedSec >= categoryCapMin * 60
+        val categoryOver = effectiveCategoryCapMin != null && catUsedSec >= effectiveCategoryCapMin * 60
         if (perAppOver || categoryOver) {
             val triggerKind = if (perAppOver) "perApp" else "category"
-            val triggerValue = if (perAppOver) "${perAppCapMin}m" else "${categoryCapMin}m"
+            val triggerValue = if (perAppOver) "${perAppCapMin}m" else "${effectiveCategoryCapMin}m"
             val displayedUsedMin = if (perAppOver) usedSec / 60 else catUsedSec / 60
             val interventionId = log(packageName, "negotiate", "shown", triggerKind, triggerValue)
             overlayManager.showNegotiation(
@@ -133,11 +151,15 @@ class InterventionEngine @Inject constructor(
         }
 
         // Soft-limit notification at 80% of whichever cap is closest.
-        maybeSoftLimitNotif(packageName, app, usedSec, catUsedSec, perAppCapMin, categoryCapMin, today, settings.softLimitPct)
+        maybeSoftLimitNotif(packageName, app, usedSec, catUsedSec, perAppCapMin, effectiveCategoryCapMin, today, settings.softLimitPct)
 
-        // Layer 1: mindfulness pause on every open. Escalates to 2× length when compulsive.
-        maybeMindfulnessPause(app, usedSec, perAppCapMin, settings.mindfulPauseSec, escalated = isCompulsive)
+        // Layer 1: mindfulness pause on every open. Escalates with compulsive use, plus
+        // any active punishment can multiply the pause length.
+        maybeMindfulnessPause(app, usedSec, perAppCapMin, settings.mindfulPauseSec, escalated = isCompulsive, multiplier = pauseMultiplier)
     }
+
+    private fun applyReduction(capMin: Int, reductionPct: Int): Int =
+        if (reductionPct <= 0) capMin else (capMin * (100 - reductionPct) / 100).coerceAtLeast(1)
 
     /**
      * Hard lock is "effective" if either:
@@ -158,9 +180,11 @@ class InterventionEngine @Inject constructor(
         perAppCapMin: Int?,
         pauseSec: Int,
         escalated: Boolean,
+        multiplier: Float = 1f,
     ) {
         if (pauseSec <= 0) return
-        val effectiveSec = if (escalated) pauseSec * 2 else pauseSec
+        val compulsiveBonus = if (escalated) 2f else 1f
+        val effectiveSec = (pauseSec * compulsiveBonus * multiplier).toInt().coerceAtLeast(pauseSec)
         log(
             app.packageName, "pause", if (escalated) "escalated" else "shown",
             "perApp", "${perAppCapMin ?: 0}m",
