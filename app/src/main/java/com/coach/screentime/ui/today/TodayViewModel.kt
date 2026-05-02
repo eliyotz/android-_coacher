@@ -5,19 +5,22 @@ import androidx.lifecycle.viewModelScope
 import com.coach.screentime.data.db.dao.AppDao
 import com.coach.screentime.data.db.dao.CategoryDao
 import com.coach.screentime.data.db.dao.RollupDao
+import com.coach.screentime.data.db.dao.SessionDao
 import com.coach.screentime.data.db.entities.AppEntity
 import com.coach.screentime.data.db.entities.CategoryEntity
 import com.coach.screentime.data.db.entities.DailyRollupEntity
+import com.coach.screentime.insights.StreakCalculator
 import com.coach.screentime.util.Time
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -26,6 +29,8 @@ class TodayViewModel @Inject constructor(
     private val rollupDao: RollupDao,
     private val appDao: AppDao,
     private val categoryDao: CategoryDao,
+    private val sessionDao: SessionDao,
+    private val streakCalculator: StreakCalculator,
 ) : ViewModel() {
 
     val state: StateFlow<TodayUiState> = combine(
@@ -36,7 +41,7 @@ class TodayViewModel @Inject constructor(
         buildUiState(rollups, apps, categories)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodayUiState.Empty)
 
-    private fun buildUiState(
+    private suspend fun buildUiState(
         rollups: List<DailyRollupEntity>,
         apps: List<AppEntity>,
         categories: List<CategoryEntity>,
@@ -81,13 +86,54 @@ class TodayViewModel @Inject constructor(
             )
         }.sortedByDescending { it.minutes }
 
+        val streak = streakCalculator.current()
+        val worstHourLabel = computeWorstHour()
+        val sevenDayAvgMinByPkg = sevenDayAverages(rows.map { it.packageName })
+        val rowsWithDelta = rows.map { r ->
+            val avg = sevenDayAvgMinByPkg[r.packageName] ?: 0
+            val deltaPct = if (avg > 0) ((r.minutes - avg) * 100) / avg else null
+            r.copy(deltaVsWeekAvgPct = deltaPct)
+        }
+
         return TodayUiState(
             totalMinutes = totalMinutes,
             totalOpens = totalOpens,
             adherence = adherence,
-            apps = rows,
+            apps = rowsWithDelta,
             categories = categoryRows,
+            streak = streak,
+            worstHourLabel = worstHourLabel,
         )
+    }
+
+    private suspend fun computeWorstHour(): String? {
+        val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val sessions = sessionDao.forDate(today)
+        if (sessions.isEmpty()) return null
+        val zone = ZoneId.systemDefault()
+        val byHour = IntArray(24)
+        sessions.forEach { s ->
+            val hour = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(s.startTs), zone).hour
+            byHour[hour] = byHour[hour] + s.durationSec
+        }
+        val worstHour = byHour.indices.maxByOrNull { byHour[it] } ?: return null
+        if (byHour[worstHour] < 60) return null
+        val mins = byHour[worstHour] / 60
+        val hh = worstHour.toString().padStart(2, '0')
+        return "${hh}:00 — ${mins}m"
+    }
+
+    private suspend fun sevenDayAverages(packages: List<String>): Map<String, Int> {
+        if (packages.isEmpty()) return emptyMap()
+        // Average over the last 7 days (excluding today).
+        val today = LocalDate.now()
+        val iso = DateTimeFormatter.ISO_LOCAL_DATE
+        val dates = (1..7).map { today.minusDays(it.toLong()).format(iso) }
+        val rollups = rollupDao.snapshotForDates(dates)
+        return packages.associateWith { pkg ->
+            val total = rollups.filter { it.packageName == pkg }.sumOf { it.totalSec }
+            (total / 60) / 7
+        }
     }
 }
 
@@ -97,6 +143,8 @@ data class TodayUiState(
     val adherence: Float,
     val apps: List<AppUsageRow>,
     val categories: List<CategoryRow>,
+    val streak: Int = 0,
+    val worstHourLabel: String? = null,
 ) {
     companion object { val Empty = TodayUiState(0, 0, 1f, emptyList(), emptyList()) }
 }
@@ -107,6 +155,7 @@ data class AppUsageRow(
     val minutes: Int,
     val opens: Int,
     val capMinutes: Int?,
+    val deltaVsWeekAvgPct: Int? = null,
 )
 
 data class CategoryRow(

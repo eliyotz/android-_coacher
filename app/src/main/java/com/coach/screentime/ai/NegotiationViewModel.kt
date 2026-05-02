@@ -64,6 +64,29 @@ class NegotiationViewModel(
         interventionId: Long,
     ): Verdict {
         val settings = settingsStore.snapshot()
+
+        // Pre-flight: detect obvious prompt-injection attempts in the user's reason
+        // and short-circuit without calling Gemini. Saves quota and prevents the
+        // model from being argued into accepting on the basis of override text.
+        if (looksLikeInjection(reason)) {
+            val verdict = Verdict(
+                accept = false,
+                extensionMinutes = settings.extensionMinutes,
+                explanation = "That looks like an attempt to override the coach. The reason has to be about your actual situation.",
+            )
+            interventionDao.insertVerdict(
+                AiVerdictEntity(
+                    interventionId = interventionId,
+                    reasonText = reason,
+                    verdict = "reject",
+                    explanation = verdict.explanation,
+                    rawResponse = "[blocked: injection attempt]",
+                    ts = System.currentTimeMillis(),
+                )
+            )
+            return verdict
+        }
+
         val goal = goalDao.activeGoal()?.text.orEmpty()
         val priorReasons = priorReasonsToday(packageName)
 
@@ -95,6 +118,30 @@ class NegotiationViewModel(
             )
         )
         return parsed
+    }
+
+    /**
+     * Coarse regex check for the most common prompt-injection patterns. Not a
+     * security boundary — the system prompt is the real defense — but this saves
+     * a round-trip and avoids the awkwardness of the model occasionally being
+     * convinced. False positives are recoverable: the user just rephrases.
+     */
+    private fun looksLikeInjection(reason: String): Boolean {
+        val s = reason.lowercase().trim()
+        if (s.length < 4) return false
+        return INJECTION_PATTERNS.any { it.containsMatchIn(s) }
+    }
+
+    private companion object {
+        val INJECTION_PATTERNS = listOf(
+            Regex("\\b(ignore|disregard|forget|override)\\b.*\\b(previous|prior|all|above|earlier)\\b.*\\b(instruction|prompt|rule|directive)\\b"),
+            Regex("\\byou (must|have to|should|need to) (say|answer|respond with|reply|output|return) (accept|yes|grant|approve)"),
+            Regex("\\bsystem (prompt|instruction|message|role)\\b"),
+            Regex("\\b(roleplay|role[- ]play|pretend (you|to))\\b"),
+            Regex("\\b(jailbreak|dan mode|developer mode)\\b"),
+            Regex("\\boutput[ \"']*\\{[ \"']*verdict[ \"']*[:=][ \"']*accept"),
+            Regex("\"verdict\"\\s*:\\s*\"accept\""),
+        )
     }
 
     private fun parseVerdict(raw: String): Verdict? {

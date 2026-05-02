@@ -40,5 +40,19 @@ class CoachApp : Application(), Configuration.Provider {
                 NotificationManager.IMPORTANCE_HIGH
             )
         )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                NotifChannels.NUDGE,
+                getString(R.string.notif_channel_nudge),
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(
+                NotifChannels.REFLECTION,
+                getString(R.string.notif_channel_reflection),
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+        )
     }
 }

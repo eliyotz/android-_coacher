@@ -143,5 +143,53 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 }
             }
         }
+
+        ExportCard(viewModel)
+    }
+}
+
+@Composable
+private fun ExportCard(viewModel: SettingsViewModel) {
+    val status by viewModel.exportStatus.collectAsState()
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: android.net.Uri? ->
+        if (uri != null) viewModel.exportTo(uri)
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Export data", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Writes a JSON file with sessions, rollups, interventions, AI verdicts, weekly reports, reflections, and nudges.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.material3.Button(
+                onClick = {
+                    val name = "screen-time-coach-${java.time.LocalDate.now()}.json"
+                    launcher.launch(name)
+                },
+                enabled = status !is ExportStatus.Running,
+            ) {
+                Text(if (status is ExportStatus.Running) "Exporting…" else "Export to file")
+            }
+            when (val s = status) {
+                is ExportStatus.Done -> Text(
+                    "Wrote ${s.byteCount} bytes.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                is ExportStatus.Failed -> Text(
+                    s.message,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                else -> {}
+            }
+        }
     }
 }

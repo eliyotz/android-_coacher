@@ -6,6 +6,8 @@ import com.coach.screentime.data.db.dao.AppDao
 import com.coach.screentime.data.db.dao.CategoryDao
 import com.coach.screentime.data.db.dao.GoalDao
 import com.coach.screentime.data.db.dao.InterventionDao
+import com.coach.screentime.data.db.dao.NudgeDao
+import com.coach.screentime.data.db.dao.ReflectionDao
 import com.coach.screentime.data.db.dao.ReportDao
 import com.coach.screentime.data.db.dao.RollupDao
 import com.coach.screentime.data.db.dao.SessionDao
@@ -15,6 +17,8 @@ import com.coach.screentime.data.db.entities.CategoryEntity
 import com.coach.screentime.data.db.entities.DailyRollupEntity
 import com.coach.screentime.data.db.entities.GoalEntity
 import com.coach.screentime.data.db.entities.InterventionEntity
+import com.coach.screentime.data.db.entities.NudgeEntity
+import com.coach.screentime.data.db.entities.ReflectionEntity
 import com.coach.screentime.data.db.entities.SessionEntity
 import com.coach.screentime.data.db.entities.WeeklyReportEntity
 
@@ -28,8 +32,10 @@ import com.coach.screentime.data.db.entities.WeeklyReportEntity
         AiVerdictEntity::class,
         WeeklyReportEntity::class,
         GoalEntity::class,
+        ReflectionEntity::class,
+        NudgeEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,4 +46,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun interventionDao(): InterventionDao
     abstract fun reportDao(): ReportDao
     abstract fun goalDao(): GoalDao
+    abstract fun reflectionDao(): ReflectionDao
+    abstract fun nudgeDao(): NudgeDao
 }

@@ -19,4 +19,10 @@ interface ReportDao {
 
     @Query("SELECT * FROM weekly_reports WHERE weekStart = :weekStart LIMIT 1")
     suspend fun byWeek(weekStart: String): WeeklyReportEntity?
+
+    @Query("SELECT * FROM weekly_reports ORDER BY weekStart DESC")
+    suspend fun snapshot(): List<WeeklyReportEntity>
+
+    @Query("SELECT * FROM weekly_reports ORDER BY weekStart DESC LIMIT :limit")
+    suspend fun recent(limit: Int): List<WeeklyReportEntity>
 }

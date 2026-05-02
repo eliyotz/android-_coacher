@@ -93,10 +93,23 @@ private fun AppRow(a: AppEntity, vm: LimitsViewModel) {
                 }
                 if (a.hardLockEnabled) {
                     Text(
-                        "Cannot be disabled until 24h after toggling.",
+                        "Cannot be disabled until 24h after toggling off.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp,
                     )
+                } else {
+                    val now = System.currentTimeMillis()
+                    val cooloffEnd = a.hardLockToggleAt + 24 * 60 * 60_000L
+                    if (a.hardLockToggleAt > 0L && cooloffEnd > now) {
+                        val remainingMs = cooloffEnd - now
+                        val hours = (remainingMs / (60 * 60_000L)).toInt()
+                        val mins = ((remainingMs % (60 * 60_000L)) / 60_000L).toInt()
+                        Text(
+                            "Lock still active. Disables in ${hours}h ${mins}m.",
+                            color = MaterialTheme.colorScheme.tertiary,
+                            fontSize = 12.sp,
+                        )
+                    }
                 }
             }
         }

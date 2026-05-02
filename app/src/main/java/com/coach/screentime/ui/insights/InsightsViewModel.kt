@@ -7,9 +7,12 @@ import androidx.work.WorkManager
 import com.coach.screentime.data.db.dao.AppDao
 import com.coach.screentime.data.db.dao.ReportDao
 import com.coach.screentime.data.db.dao.RollupDao
+import com.coach.screentime.data.db.dao.SessionDao
 import com.coach.screentime.data.db.entities.WeeklyReportEntity
 import com.coach.screentime.util.Time
 import com.coach.screentime.work.WeeklyReportWorker
+import java.time.LocalDateTime
+import java.time.ZoneId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import android.content.Context
@@ -26,6 +29,7 @@ class InsightsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val reportDao: ReportDao,
     private val rollupDao: RollupDao,
+    private val sessionDao: SessionDao,
     private val appDao: AppDao,
 ) : ViewModel() {
 
@@ -39,12 +43,30 @@ class InsightsViewModel @Inject constructor(
             val total = rollupRows.filter { it.dateLocal == date }.sumOf { it.totalSec } / 60
             DayBar(date = date, minutes = total)
         }
+        val heatmap = buildHeatmap(days)
         InsightsUiState(
             reports = reports,
             sevenDayBars = byDate,
+            heatmap = heatmap,
             empty = reports.isEmpty(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InsightsUiState.Empty)
+
+    /** 7×24 grid of minutes, [day][hour]. Day 0 = oldest (6 days ago), Day 6 = today. */
+    private suspend fun buildHeatmap(days: List<String>): Array<IntArray> {
+        // days arrives as [today, yesterday, ...] — reverse to chronological.
+        val ordered = days.reversed()
+        val sessions = sessionDao.forDates(ordered)
+        val zone = ZoneId.systemDefault()
+        val grid = Array(7) { IntArray(24) }
+        sessions.forEach { s ->
+            val day = ordered.indexOf(s.dateLocal)
+            if (day < 0) return@forEach
+            val hour = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(s.startTs), zone).hour
+            grid[day][hour] = grid[day][hour] + s.durationSec / 60
+        }
+        return grid
+    }
 
     fun runReportNow() {
         WorkManager.getInstance(context).enqueue(
@@ -56,9 +78,10 @@ class InsightsViewModel @Inject constructor(
 data class InsightsUiState(
     val reports: List<WeeklyReportEntity>,
     val sevenDayBars: List<DayBar>,
+    val heatmap: Array<IntArray> = emptyArray(),
     val empty: Boolean,
 ) {
-    companion object { val Empty = InsightsUiState(emptyList(), emptyList(), true) }
+    companion object { val Empty = InsightsUiState(emptyList(), emptyList(), emptyArray(), true) }
 }
 
 data class DayBar(val date: String, val minutes: Int)

@@ -18,4 +18,10 @@ interface SessionDao {
 
     @Query("DELETE FROM sessions WHERE dateLocal < :cutoffDate")
     suspend fun pruneOlderThan(cutoffDate: String)
+
+    @Query("SELECT COUNT(*) FROM sessions WHERE packageName = :pkg AND startTs >= :sinceTs")
+    suspend fun openCountSince(pkg: String, sinceTs: Long): Int
+
+    @Query("SELECT COUNT(*) FROM sessions WHERE packageName IN (:packages) AND startTs >= :sinceTs")
+    suspend fun openCountForPackagesSince(packages: List<String>, sinceTs: Long): Int
 }

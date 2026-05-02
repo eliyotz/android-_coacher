@@ -94,3 +94,29 @@ data class GoalEntity(
     val active: Boolean,
     val createdAt: Long,
 )
+
+@Entity(
+    tableName = "reflection_entries",
+    indices = [Index(value = ["dateLocal"], unique = true)]
+)
+data class ReflectionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val dateLocal: String,
+    val feeling: Int,
+    val triggerText: String,
+    val createdAt: Long,
+)
+
+@Entity(
+    tableName = "nudge_entries",
+    indices = [Index("ts")]
+)
+data class NudgeEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val ts: Long,
+    val title: String,
+    val body: String,
+    val actionKind: String,
+    val actionTaken: Boolean,
+    val rawResponse: String,
+)

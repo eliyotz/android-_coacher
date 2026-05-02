@@ -47,6 +47,24 @@ fun InsightsScreen(viewModel: InsightsViewModel = hiltViewModel()) {
             }
         }
 
+        if (state.heatmap.isNotEmpty()) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(20.dp)) {
+                        Text("When you use your phone", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Heatmap of minutes per hour, last 7 days. Darker = more.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        HourHeatmap(state.heatmap)
+                    }
+                }
+            }
+        }
+
         if (state.empty) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -74,6 +92,59 @@ fun InsightsScreen(viewModel: InsightsViewModel = hiltViewModel()) {
             }
             item {
                 Button(onClick = { viewModel.runReportNow() }) { Text("Re-run latest report") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HourHeatmap(grid: Array<IntArray>) {
+    val max = (grid.maxOfOrNull { row -> row.maxOrNull() ?: 0 } ?: 1).coerceAtLeast(1)
+    val primary = MaterialTheme.colorScheme.primary
+    val empty = MaterialTheme.colorScheme.surfaceVariant
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        // Hour-of-day axis: 0, 6, 12, 18 labels
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Spacer(Modifier.width(20.dp))
+            (0..23).forEach { h ->
+                val show = h % 6 == 0
+                Text(
+                    if (show) h.toString() else " ",
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        grid.indices.forEach { day ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val label = when (day) {
+                    grid.size - 1 -> "Now"
+                    grid.size - 2 -> "-1d"
+                    else -> "-${grid.size - 1 - day}d"
+                }
+                Text(
+                    label,
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(20.dp),
+                )
+                (0..23).forEach { hour ->
+                    val v = grid[day][hour]
+                    val alpha = (v.toFloat() / max).coerceIn(0f, 1f)
+                    val cellColor = if (v == 0) empty else primary.copy(alpha = 0.15f + 0.85f * alpha)
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(14.dp)
+                            .padding(end = 1.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(cellColor)
+                    )
+                }
             }
         }
     }

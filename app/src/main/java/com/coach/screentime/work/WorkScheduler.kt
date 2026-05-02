@@ -22,6 +22,9 @@ class WorkScheduler @Inject constructor(
     fun scheduleAll() {
         scheduleWeeklyReport()
         scheduleDailyPrune()
+        scheduleServiceWatchdog()
+        scheduleNudges()
+        scheduleMorningReflection()
     }
 
     private fun scheduleWeeklyReport() {
@@ -51,6 +54,46 @@ class WorkScheduler @Inject constructor(
         val req = PeriodicWorkRequestBuilder<DailyRollupWorker>(1, TimeUnit.DAYS).build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             "daily_prune",
+            ExistingPeriodicWorkPolicy.KEEP,
+            req,
+        )
+    }
+
+    private fun scheduleServiceWatchdog() {
+        val req = PeriodicWorkRequestBuilder<ServiceWatchdogWorker>(15, TimeUnit.MINUTES).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "service_watchdog",
+            ExistingPeriodicWorkPolicy.KEEP,
+            req,
+        )
+    }
+
+    private fun scheduleNudges() {
+        val req = PeriodicWorkRequestBuilder<NudgeWorker>(2, TimeUnit.HOURS)
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "nudges",
+            ExistingPeriodicWorkPolicy.KEEP,
+            req,
+        )
+    }
+
+    private fun scheduleMorningReflection() {
+        val now = LocalDateTime.now(ZoneId.systemDefault())
+        var next7am = now.withHour(7).withMinute(0).withSecond(0).withNano(0)
+        if (!next7am.isAfter(now)) next7am = next7am.plusDays(1)
+        val initialDelay = Duration.between(now, next7am).toMillis().coerceAtLeast(0)
+
+        val req = PeriodicWorkRequestBuilder<MorningReflectionWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "morning_reflection",
             ExistingPeriodicWorkPolicy.KEEP,
             req,
         )

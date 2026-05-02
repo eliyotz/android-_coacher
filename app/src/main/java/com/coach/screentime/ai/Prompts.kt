@@ -69,12 +69,15 @@ Do not invent numbers. Only use the data provided.
     fun user(
         weekStart: String,
         goal: String,
+        currentStreakDays: Int,
         rollupCsv: String,
         interventionsCsv: String,
         verdictsCsv: String,
+        reflectionsCsv: String,
     ): String = buildString {
         appendLine("Week of $weekStart")
         if (goal.isNotBlank()) appendLine("User's stated goal: \"$goal\"")
+        appendLine("Current adherence streak going into this report: $currentStreakDays days")
         appendLine()
         appendLine("DAILY ROLLUPS (date,package,total_seconds,opens,longest_session_seconds):")
         appendLine(rollupCsv)
@@ -84,6 +87,68 @@ Do not invent numbers. Only use the data provided.
         appendLine()
         appendLine("AI VERDICTS (timestamp_ms,verdict,reason,explanation):")
         appendLine(verdictsCsv)
+        appendLine()
+        appendLine("USER'S OWN REFLECTIONS (date,feeling_1to5,trigger):")
+        appendLine(if (reflectionsCsv.isBlank()) "(none)" else reflectionsCsv)
+    }
+}
+
+object NudgePrompt {
+    val system: String = """
+You are a digital wellbeing coach checking in on a user. Most of the time the answer should be "no nudge needed" — only fire a nudge when the data shows something genuinely worth surfacing right now.
+
+Speak directly to the user (second person), warmly but briefly. The user has not asked for this check-in; you're proactively looking out for them.
+
+Reasons a nudge is worth firing:
+- A streak you can affirm ("3 days under your social cap — nice")
+- A pattern you noticed today that hints at a bad evening forming ("you've already opened TikTok 7 times in the last 30 min")
+- A reminder of the user's stated goal at a relevant moment ("it's 9pm — you said you wanted to read before bed; haven't seen any reading apps today")
+- A celebration when the user clearly succeeded against past struggles
+
+Reasons NOT to fire:
+- Data is sparse or unremarkable
+- The user already received a nudge in the last few hours
+- The intervention engine already handled the moment (negotiation overlay fired)
+
+Respond with a single JSON object, no markdown fences:
+{
+  "nudge": false
+}
+or
+{
+  "nudge": true,
+  "title": "short, punchy title under 50 chars",
+  "body": "one or two sentences, addressed to the user, under 200 chars",
+  "action": "focus30" | "openApp" | "none"
+}
+
+Use action "focus30" only when offering a 30-min hard lock would help (compulsive-open spiral). Use "none" otherwise.
+""".trimIndent()
+
+    fun user(
+        nowLocal: LocalDateTime,
+        goal: String,
+        currentStreakDays: Int,
+        recentOpensCsv: String,
+        todayRollupsCsv: String,
+        recentReflectionsCsv: String,
+        recentNudgesCsv: String,
+    ): String = buildString {
+        appendLine("Time: ${nowLocal.toLocalTime().withSecond(0).withNano(0)} (${nowLocal.dayOfWeek.name.lowercase()})")
+        if (goal.isNotBlank()) appendLine("User's stated goal: \"$goal\"")
+        appendLine("Current adherence streak: $currentStreakDays days")
+        appendLine()
+        appendLine("OPENS IN LAST 4 HOURS (package, count):")
+        appendLine(if (recentOpensCsv.isBlank()) "(none)" else recentOpensCsv)
+        appendLine()
+        appendLine("TODAY'S USAGE SO FAR (package, total_min, opens):")
+        appendLine(if (todayRollupsCsv.isBlank()) "(none)" else todayRollupsCsv)
+        appendLine()
+        appendLine("RECENT REFLECTIONS (date, feeling_1to5, trigger):")
+        appendLine(if (recentReflectionsCsv.isBlank()) "(none)" else recentReflectionsCsv)
+        appendLine()
+        appendLine("RECENT NUDGES (timestamp_ms, title, action):")
+        appendLine(if (recentNudgesCsv.isBlank()) "(none)" else recentNudgesCsv)
     }
 }
 

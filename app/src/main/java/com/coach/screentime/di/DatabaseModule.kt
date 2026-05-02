@@ -7,6 +7,8 @@ import com.coach.screentime.data.db.dao.AppDao
 import com.coach.screentime.data.db.dao.CategoryDao
 import com.coach.screentime.data.db.dao.GoalDao
 import com.coach.screentime.data.db.dao.InterventionDao
+import com.coach.screentime.data.db.dao.NudgeDao
+import com.coach.screentime.data.db.dao.ReflectionDao
 import com.coach.screentime.data.db.dao.ReportDao
 import com.coach.screentime.data.db.dao.RollupDao
 import com.coach.screentime.data.db.dao.SessionDao
@@ -35,4 +37,6 @@ object DatabaseModule {
     @Provides fun interventionDao(db: AppDatabase): InterventionDao = db.interventionDao()
     @Provides fun reportDao(db: AppDatabase): ReportDao = db.reportDao()
     @Provides fun goalDao(db: AppDatabase): GoalDao = db.goalDao()
+    @Provides fun reflectionDao(db: AppDatabase): ReflectionDao = db.reflectionDao()
+    @Provides fun nudgeDao(db: AppDatabase): NudgeDao = db.nudgeDao()
 }

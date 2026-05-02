@@ -32,7 +32,26 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <activity
+            android:name=".focus.FocusActivity"
+            android:exported="true"
+            android:label="@string/shortcut_focus_short"
+            android:theme="@style/Theme.ScreenTimeCoach">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".reflection.ReflectionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ScreenTimeCoach" />
 
         <service
             android:name=".tracking.ForegroundAppService"
@@ -64,6 +83,27 @@
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".focus.FocusActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.coach.screentime.focus.START" />
+                <action android:name="com.coach.screentime.focus.STOP" />
+                <action android:name="com.coach.screentime.focus.CYCLE" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".focus.FocusModeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_launcher_foreground"
+            android:label="@string/focus_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <provider
             android:name="androidx.startup.InitializationProvider"

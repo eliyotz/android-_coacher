@@ -1,5 +1,6 @@
 package com.coach.screentime.ui.settings
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.coach.screentime.data.db.dao.GoalDao
@@ -7,9 +8,12 @@ import com.coach.screentime.data.db.entities.GoalEntity
 import com.coach.screentime.data.store.Mode
 import com.coach.screentime.data.store.SettingsStore
 import com.coach.screentime.data.store.Strictness
+import com.coach.screentime.export.JsonExporter
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -19,6 +23,7 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val settingsStore: SettingsStore,
     private val goalDao: GoalDao,
+    private val jsonExporter: JsonExporter,
 ) : ViewModel() {
 
     val state: StateFlow<SettingsUiState> = combine(
@@ -31,6 +36,9 @@ class SettingsViewModel @Inject constructor(
         SettingsUiState(strictness, mode, pauseSec, extMin, goal?.text.orEmpty())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState.Empty)
 
+    private val _exportStatus = MutableStateFlow<ExportStatus>(ExportStatus.Idle)
+    val exportStatus: StateFlow<ExportStatus> = _exportStatus.asStateFlow()
+
     fun setStrictness(s: Strictness) = viewModelScope.launch { settingsStore.setStrictness(s) }
     fun setMode(m: Mode) = viewModelScope.launch { settingsStore.setMode(m) }
     fun setPauseSec(s: Int) = viewModelScope.launch { settingsStore.setMindfulPauseSec(s) }
@@ -40,6 +48,19 @@ class SettingsViewModel @Inject constructor(
         if (text.isNotBlank()) {
             goalDao.insert(GoalEntity(text = text.trim(), active = true, createdAt = System.currentTimeMillis()))
         }
+    }
+
+    fun exportTo(uri: Uri) = viewModelScope.launch {
+        _exportStatus.value = ExportStatus.Running
+        val result = jsonExporter.exportTo(uri)
+        _exportStatus.value = result.fold(
+            onSuccess = { ExportStatus.Done(it) },
+            onFailure = { ExportStatus.Failed(it.message ?: "Export failed") },
+        )
+    }
+
+    fun clearExportStatus() {
+        _exportStatus.value = ExportStatus.Idle
     }
 }
 
@@ -53,4 +74,11 @@ data class SettingsUiState(
     companion object {
         val Empty = SettingsUiState(Strictness.BALANCED, Mode.OBSERVE, 5, 15, "")
     }
+}
+
+sealed interface ExportStatus {
+    data object Idle : ExportStatus
+    data object Running : ExportStatus
+    data class Done(val byteCount: Long) : ExportStatus
+    data class Failed(val message: String) : ExportStatus
 }

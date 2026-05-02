@@ -36,6 +36,9 @@ class SettingsStore @Inject constructor(
         val EXTENSION_MINUTES = intPreferencesKey("extension_minutes")
         val USER_GOAL = stringPreferencesKey("user_goal")
         val LAST_WEEKLY_REPORT_AT = longPreferencesKey("last_weekly_report_at")
+        val FOCUS_END_TS = longPreferencesKey("focus_end_ts")
+        val NUDGES_ENABLED = booleanPreferencesKey("nudges_enabled")
+        val REFLECTION_ENABLED = booleanPreferencesKey("reflection_enabled")
     }
 
     val onboarded: Flow<Boolean> = ds.data.map { it[Keys.ONBOARDED] ?: false }
@@ -46,6 +49,9 @@ class SettingsStore @Inject constructor(
     val softLimitPct: Flow<Int> = ds.data.map { it[Keys.SOFT_LIMIT_PCT] ?: 80 }
     val extensionMinutes: Flow<Int> = ds.data.map { it[Keys.EXTENSION_MINUTES] ?: 15 }
     val userGoal: Flow<String> = ds.data.map { it[Keys.USER_GOAL] ?: "" }
+    val focusEndTs: Flow<Long> = ds.data.map { it[Keys.FOCUS_END_TS] ?: 0L }
+    val nudgesEnabled: Flow<Boolean> = ds.data.map { it[Keys.NUDGES_ENABLED] ?: true }
+    val reflectionEnabled: Flow<Boolean> = ds.data.map { it[Keys.REFLECTION_ENABLED] ?: true }
 
     suspend fun snapshot(): Snapshot {
         val p: Preferences = ds.data.first()
@@ -59,6 +65,9 @@ class SettingsStore @Inject constructor(
             userGoal = p[Keys.USER_GOAL] ?: "",
             observeStartTs = p[Keys.OBSERVE_START] ?: 0L,
             lastWeeklyReportAt = p[Keys.LAST_WEEKLY_REPORT_AT] ?: 0L,
+            focusEndTs = p[Keys.FOCUS_END_TS] ?: 0L,
+            nudgesEnabled = p[Keys.NUDGES_ENABLED] ?: true,
+            reflectionEnabled = p[Keys.REFLECTION_ENABLED] ?: true,
         )
     }
 
@@ -71,6 +80,9 @@ class SettingsStore @Inject constructor(
     suspend fun setUserGoal(value: String) = ds.edit { it[Keys.USER_GOAL] = value }
     suspend fun setObserveStart(ts: Long) = ds.edit { it[Keys.OBSERVE_START] = ts }
     suspend fun setLastWeeklyReportAt(ts: Long) = ds.edit { it[Keys.LAST_WEEKLY_REPORT_AT] = ts }
+    suspend fun setFocusEndTs(ts: Long) = ds.edit { it[Keys.FOCUS_END_TS] = ts }
+    suspend fun setNudgesEnabled(value: Boolean) = ds.edit { it[Keys.NUDGES_ENABLED] = value }
+    suspend fun setReflectionEnabled(value: Boolean) = ds.edit { it[Keys.REFLECTION_ENABLED] = value }
 
     data class Snapshot(
         val onboarded: Boolean,
@@ -82,5 +94,8 @@ class SettingsStore @Inject constructor(
         val userGoal: String,
         val observeStartTs: Long,
         val lastWeeklyReportAt: Long,
+        val focusEndTs: Long,
+        val nudgesEnabled: Boolean,
+        val reflectionEnabled: Boolean,
     )
 }
