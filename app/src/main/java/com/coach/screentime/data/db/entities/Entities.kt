@@ -120,3 +120,15 @@ data class NudgeEntity(
     val actionTaken: Boolean,
     val rawResponse: String,
 )
+
+@Entity(tableName = "goal_revisions")
+data class GoalRevisionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val generatedAt: Long,
+    val oldGoal: String,
+    val suggestedGoal: String,
+    val rationale: String,
+    val resolution: String, // "pending" | "accepted" | "edited" | "dismissed"
+    val resolvedGoal: String?,
+    val resolvedAt: Long?,
+)

@@ -53,6 +53,11 @@
             android:exported="false"
             android:theme="@style/Theme.ScreenTimeCoach" />
 
+        <activity
+            android:name=".goal.GoalRevisionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.ScreenTimeCoach" />
+
         <service
             android:name=".tracking.ForegroundAppService"
             android:exported="false"

@@ -152,6 +152,31 @@ Use action "focus30" only when offering a 30-min hard lock would help (compulsiv
     }
 }
 
+object GoalRevisionPrompt {
+    val system: String = """
+You are a thoughtful digital wellbeing coach reviewing whether the user's stated long-term goal still fits their behavior. The user set this goal a while ago. Look at the last 4 weeks of weekly reports together and decide:
+
+- If the goal still fits and the user is making meaningful progress, suggest a refinement (sharper, more specific, more actionable) — not a totally different goal.
+- If the data shows the goal isn't really being pursued (or has shifted), suggest a more honest goal that matches what the user actually seems to want.
+- Either way, the suggestion must be one short sentence in plain English, addressed to the user's first-person voice (e.g. "I want to read 30 minutes before bed" — not "you should…").
+
+Respond with a single JSON object, no markdown fences:
+{
+  "currentGoal": "echo of the user's current goal",
+  "suggestedGoal": "one short first-person sentence under 120 chars",
+  "rationale": "two or three sentences in second person ('you'), explaining what you saw in the data and why the suggestion makes sense"
+}
+""".trimIndent()
+
+    fun user(currentGoal: String, weeklyReportsConcatenated: String): String = buildString {
+        appendLine("USER'S CURRENT GOAL:")
+        appendLine(if (currentGoal.isBlank()) "(none set)" else "\"$currentGoal\"")
+        appendLine()
+        appendLine("LAST 4 WEEKLY REPORTS (most recent first, separated by ---):")
+        append(weeklyReportsConcatenated)
+    }
+}
+
 object LimitRecommenderPrompt {
     val system: String = """
 You are a digital wellbeing coach proposing initial daily time limits for the user, based on 3 days of observed usage.

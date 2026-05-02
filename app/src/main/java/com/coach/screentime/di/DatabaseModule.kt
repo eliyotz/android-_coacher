@@ -6,6 +6,7 @@ import com.coach.screentime.data.db.AppDatabase
 import com.coach.screentime.data.db.dao.AppDao
 import com.coach.screentime.data.db.dao.CategoryDao
 import com.coach.screentime.data.db.dao.GoalDao
+import com.coach.screentime.data.db.dao.GoalRevisionDao
 import com.coach.screentime.data.db.dao.InterventionDao
 import com.coach.screentime.data.db.dao.NudgeDao
 import com.coach.screentime.data.db.dao.ReflectionDao
@@ -27,6 +28,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "coach.db")
+            .addMigrations(AppDatabase.MIGRATION_2_3)
             .fallbackToDestructiveMigration()
             .build()
 
@@ -39,4 +41,5 @@ object DatabaseModule {
     @Provides fun goalDao(db: AppDatabase): GoalDao = db.goalDao()
     @Provides fun reflectionDao(db: AppDatabase): ReflectionDao = db.reflectionDao()
     @Provides fun nudgeDao(db: AppDatabase): NudgeDao = db.nudgeDao()
+    @Provides fun goalRevisionDao(db: AppDatabase): GoalRevisionDao = db.goalRevisionDao()
 }
