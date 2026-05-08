@@ -1,5 +1,6 @@
 package com.coach.screentime.ai
 
+import android.util.Log
 import com.coach.screentime.data.db.dao.AppDao
 import com.coach.screentime.data.db.dao.CategoryDao
 import com.coach.screentime.data.db.dao.GoalDao
@@ -102,6 +103,7 @@ class NegotiationViewModel(
         )
 
         val result = geminiClient.generate(systemPrompt, userPrompt)
+        Log.d("CoachDebug", "raw=${result.getOrNull()} err=${result.exceptionOrNull()?.message}")
         val parsed = result.fold(
             onSuccess = { raw -> parseVerdict(raw) ?: fallback(settings.strictness, settings.extensionMinutes, "Couldn't parse coach response.") },
             onFailure = { fallback(settings.strictness, settings.extensionMinutes, "Coach unreachable: ${it.message ?: "unknown error"}") },
@@ -145,16 +147,29 @@ class NegotiationViewModel(
     }
 
     private fun parseVerdict(raw: String): Verdict? {
-        val trimmed = raw.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
-        return runCatching {
-            val v = verdictAdapter.fromJson(trimmed) ?: return null
-            val accept = v.verdict.equals("accept", ignoreCase = true)
-            Verdict(
-                accept = accept,
-                extensionMinutes = v.extensionMinutes.coerceIn(5, 30),
-                explanation = v.explanation.take(220),
-            )
-        }.getOrNull()
+        val stripped = raw.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+        return tryParseJson(stripped) ?: extractFirstJsonObject(stripped)?.let { tryParseJson(it) }
+    }
+
+    private fun tryParseJson(json: String): Verdict? = runCatching {
+        val v = verdictAdapter.fromJson(json) ?: return null
+        Verdict(
+            accept = v.verdict.equals("accept", ignoreCase = true),
+            extensionMinutes = v.extensionMinutes.coerceIn(5, 30),
+            explanation = v.explanation.take(220),
+        )
+    }.getOrNull()
+
+    private fun extractFirstJsonObject(text: String): String? {
+        val start = text.indexOf('{').takeIf { it >= 0 } ?: return null
+        var depth = 0
+        for (i in start until text.length) {
+            when (text[i]) {
+                '{' -> depth++
+                '}' -> if (--depth == 0) return text.substring(start, i + 1)
+            }
+        }
+        return null
     }
 
     private fun fallback(strictness: Strictness, defaultMinutes: Int, why: String): Verdict = when (strictness) {
