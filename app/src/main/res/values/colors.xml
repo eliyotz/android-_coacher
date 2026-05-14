@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="overlay_scrim">#B3000000</color>
+    <color name="icon_stroke">#1A1916</color>
 </resources>
