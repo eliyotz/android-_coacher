@@ -102,6 +102,19 @@ class TaskEscalationEngine @Inject constructor(
                         firePrompt(task, state, followUp = true)
                     }
                 }
+                TasksRepository.STATE_DISMISSED_PENDING -> {
+                    // The user "served their sentence" — once every punishment
+                    // tied to this task has expired, prompt them again. Without
+                    // this branch the task is effectively forgotten after the
+                    // first dismissal, which defeats the whole "can't ignore me"
+                    // design.
+                    val stillBeingPunished = punishmentManager.activeNow(now)
+                        .any { it.taskGoogleId == task.googleId }
+                    val stillOverdue = (task.dueDateMs ?: Long.MAX_VALUE) < now
+                    if (!stillBeingPunished && stillOverdue) {
+                        firePrompt(task, state, followUp = true)
+                    }
+                }
             }
         }
     }
@@ -256,14 +269,26 @@ class TaskEscalationEngine @Inject constructor(
             .take(3)
             .map { it.packageName }
         val durationH = when (severity) { "harsh" -> 8; "medium" -> 3; else -> 1 }
+        // If we have no usage data to target specific apps (new user, sparse
+        // rollups), an empty-block punishment is invisible to the user — they
+        // would experience "nothing happened" and feel safe ignoring the coach
+        // forever. Force Focus mode for the same window so there's a real
+        // consequence regardless of usage history.
+        val noTargets = targets.isEmpty()
+        val forcedFocusMinutes = if (noTargets) (durationH * 60).coerceAtMost(180) else 0
+        val explanation = if (noTargets) {
+            "Coach unreachable. Forcing focus mode for ${forcedFocusMinutes} min — all flagged apps locked."
+        } else {
+            "Coach unreachable. Default punishment: blocking your top apps for ${durationH}h."
+        }
         return TaskVerdict(
             decision = "punish",
-            explanation = "Coach unreachable. Default punishment: blocking your top apps for ${durationH}h.",
+            explanation = explanation,
             delay = null,
             punishment = TaskPunishment(
                 blockedPackages = targets,
                 capReductionPct = if (severity == "harsh") 30 else 10,
-                focusMinutes = 0,
+                focusMinutes = forcedFocusMinutes,
                 mindfulPauseMultiplier = if (severity == "harsh") 2.0f else 1.5f,
                 durationHours = durationH,
                 severity = severity,

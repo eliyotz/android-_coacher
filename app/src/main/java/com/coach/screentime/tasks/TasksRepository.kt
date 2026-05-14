@@ -13,6 +13,9 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -56,7 +59,7 @@ class TasksRepository @Inject constructor(
                         listId = list.id,
                         title = t.title,
                         notes = t.notes.orEmpty(),
-                        dueDateMs = t.due?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() },
+                        dueDateMs = parseDueAsLocalTrigger(t.due),
                         completed = t.status == "completed",
                         etag = t.etag.orEmpty(),
                         fetchedAt = now,
@@ -84,6 +87,23 @@ class TasksRepository @Inject constructor(
             }
             mirrored.size
         }
+    }
+
+    /**
+     * Google's `due` field is always midnight UTC of the due *date* — the
+     * v1 API doesn't surface the time-of-day the user set. Taking that
+     * literally means a task "due today" is "overdue" at midnight UTC,
+     * which falls in the previous evening for most western time zones
+     * and gives the user no breathing room. Interpret as **noon local on
+     * the due date** instead: the user has the morning to plan; the
+     * coach starts checking in around noon.
+     */
+    private fun parseDueAsLocalTrigger(dueIso: String?): Long? {
+        if (dueIso.isNullOrBlank()) return null
+        val instant = runCatching { Instant.parse(dueIso) }.getOrNull() ?: return null
+        val dueDate = instant.atZone(ZoneOffset.UTC).toLocalDate()
+        val triggerAtLocal = dueDate.atTime(LocalTime.NOON).atZone(ZoneId.systemDefault())
+        return triggerAtLocal.toInstant().toEpochMilli()
     }
 
     fun signOut() {

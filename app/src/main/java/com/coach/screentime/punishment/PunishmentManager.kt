@@ -2,6 +2,7 @@ package com.coach.screentime.punishment
 
 import com.coach.screentime.data.db.dao.PunishmentDao
 import com.coach.screentime.data.db.entities.PunishmentEntity
+import com.coach.screentime.focus.FocusManager
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -23,6 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class PunishmentManager @Inject constructor(
     private val punishmentDao: PunishmentDao,
+    private val focusManager: FocusManager,
 ) {
     private val moshi: Moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private val packagesType = Types.newParameterizedType(List::class.java, String::class.java)
@@ -71,7 +73,8 @@ class PunishmentManager @Inject constructor(
         severity: String,
     ): Long {
         val now = System.currentTimeMillis()
-        return punishmentDao.insert(
+        val coercedFocusMin = focusMinutes.coerceAtLeast(0)
+        val id = punishmentDao.insert(
             PunishmentEntity(
                 decidedAt = now,
                 source = source,
@@ -79,12 +82,18 @@ class PunishmentManager @Inject constructor(
                 expiresAt = now + durationMs.coerceAtLeast(0L),
                 blockedPackagesJson = packagesAdapter.toJson(blockedPackages),
                 capReductionPct = capReductionPct.coerceIn(0, 90),
-                focusMinutes = focusMinutes.coerceAtLeast(0),
+                focusMinutes = coercedFocusMin,
                 mindfulPauseMultiplier = mindfulPauseMultiplier.coerceIn(1f, 5f),
                 rationale = rationale.take(400),
                 severity = severity,
             )
         )
+        // If the AI chose to force focus mode, engage it now. Without this the
+        // focusMinutes field was just metadata that nobody read.
+        if (coercedFocusMin > 0) {
+            focusManager.start(coercedFocusMin)
+        }
+        return id
     }
 
     fun parsePackages(json: String): List<String> =
