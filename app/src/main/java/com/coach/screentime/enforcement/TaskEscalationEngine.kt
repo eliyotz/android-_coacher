@@ -360,6 +360,18 @@ class TaskEscalationEngine @Inject constructor(
         // don't record it — it shouldn't count toward future AI judgment history.
         val reasonToRecord = if (fromFallback) "" else userReason
         val now = System.currentTimeMillis()
+
+        // Appeal-protection: if the user is appealing an existing punishment and the AI is
+        // unreachable, refuse to apply more punishment on top — keep the current state and
+        // tell the user to try again. Without this, every retry during a 429 storm would
+        // stack punishments.
+        val isAppealingExistingPunishment = state.state == TasksRepository.STATE_DISMISSED_PENDING &&
+            punishmentManager.activeNow(now).any { it.taskGoogleId == task.googleId }
+        if (fromFallback && isAppealingExistingPunishment) {
+            android.util.Log.i("TaskCoach", "Fallback during appeal — leaving existing punishment in place, no new verdict applied.")
+            return "Coach didn't weigh in this time — your appeal wasn't applied. Try again in a minute."
+        }
+
         when (verdict.decision) {
             "allow_delay" -> {
                 val parsedIso = verdict.delay?.untilIso?.let(::parseFlexibleDateTimeMs)
@@ -430,7 +442,7 @@ class TaskEscalationEngine @Inject constructor(
                 postExplanationNotification(task, verdict, accepted = false)
             }
         }
-        return verdict.explanation
+        return if (fromFallback) "⚠ Default rule applied — coach didn't weigh in. ${verdict.explanation}" else verdict.explanation
     }
 
     private fun postExplanationNotification(task: TaskEntity, verdict: TaskVerdict, accepted: Boolean) {
