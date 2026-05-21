@@ -99,5 +99,25 @@ class PunishmentManager @Inject constructor(
     fun parsePackages(json: String): List<String> =
         runCatching { packagesAdapter.fromJson(json).orEmpty() }.getOrDefault(emptyList())
 
+    /**
+     * Reverse all active punishments tied to [taskGoogleId] — the coach granted the user's appeal.
+     * If any lifted punishment had `focusMinutes > 0` and no other active punishment is keeping
+     * focus mode running, also stop focus mode.
+     *
+     * @return number of punishment rows that were lifted.
+     */
+    suspend fun liftFor(taskGoogleId: String): Int {
+        val now = System.currentTimeMillis()
+        val lifted = punishmentDao.activeForTask(taskGoogleId, now)
+        if (lifted.isEmpty()) return 0
+        punishmentDao.expireActiveForTask(taskGoogleId, now)
+        val anyLiftedHadFocus = lifted.any { it.focusMinutes > 0 }
+        if (anyLiftedHadFocus) {
+            val otherWithFocus = punishmentDao.activeSnapshot(now).any { it.focusMinutes > 0 }
+            if (!otherWithFocus) focusManager.stop()
+        }
+        return lifted.size
+    }
+
     data class ActiveBlock(val punishment: PunishmentEntity, val blockedPackages: List<String>)
 }

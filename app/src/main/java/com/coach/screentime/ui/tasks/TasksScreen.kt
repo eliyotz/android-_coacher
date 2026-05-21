@@ -363,6 +363,12 @@ private fun TaskActionSheet(
 ) {
     var showReasonInput by remember { mutableStateOf(false) }
     var reason by remember { mutableStateOf("") }
+    val isPunished = row.state == "dismissed_pending"
+    val askLabel = if (isPunished) "Appeal — give coach more context" else "Can't right now — ask coach"
+    val reasonHeader = if (isPunished)
+        "Tell the coach why they should reconsider. If granted, the punishment will be lifted."
+    else
+        "Tell the coach why you can't do this right now."
 
     Column(
         modifier = Modifier
@@ -414,12 +420,12 @@ private fun TaskActionSheet(
                 border = androidx.compose.foundation.BorderStroke(1.dp, Rule),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink),
             ) {
-                Text("Can't right now — ask coach", style = CoachType.titleSm)
+                Text(askLabel, style = CoachType.titleSm)
             }
         } else {
             // Reason input
             Text(
-                "Tell the coach why you can't do this right now.",
+                reasonHeader,
                 style = CoachType.bodyMd,
                 color = Ink2,
             )

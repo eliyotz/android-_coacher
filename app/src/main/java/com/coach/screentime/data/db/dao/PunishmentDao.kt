@@ -22,4 +22,11 @@ interface PunishmentDao {
 
     @Query("DELETE FROM punishments WHERE expiresAt < :cutoffMs")
     suspend fun pruneOlderThan(cutoffMs: Long)
+
+    /** Used when the coach reverses a punishment (e.g. delay granted on appeal). */
+    @Query("UPDATE punishments SET expiresAt = :nowMs WHERE taskGoogleId = :taskGoogleId AND expiresAt > :nowMs")
+    suspend fun expireActiveForTask(taskGoogleId: String, nowMs: Long): Int
+
+    @Query("SELECT * FROM punishments WHERE taskGoogleId = :taskGoogleId AND expiresAt > :nowMs")
+    suspend fun activeForTask(taskGoogleId: String, nowMs: Long): List<PunishmentEntity>
 }

@@ -367,6 +367,12 @@ class TaskEscalationEngine @Inject constructor(
                     android.util.Log.w("TaskCoach", "Could not parse delay.untilIso='${verdict.delay.untilIso}', falling back to 4h")
                 }
                 val until = parsedIso ?: (now + TimeUnit.HOURS.toMillis(4)) // fallback: 4h delay
+                // If the user previously got punished for this task and is now appealing
+                // successfully, lift the punishment so the delay actually takes effect.
+                val liftedCount = punishmentManager.liftFor(task.googleId)
+                if (liftedCount > 0) {
+                    android.util.Log.i("TaskCoach", "Appeal granted: lifted $liftedCount punishment(s) for '${task.title}'")
+                }
                 taskDelayDao.insert(
                     TaskDelayEntity(
                         googleId = task.googleId,
