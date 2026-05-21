@@ -52,7 +52,7 @@ import com.coach.screentime.data.db.entities.WeeklyReportEntity
         TaskDelayEntity::class,
         PunishmentEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -153,6 +153,14 @@ abstract class AppDatabase : RoomDatabase() {
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_punishments_expiresAt ON punishments(expiresAt)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_punishments_decidedAt ON punishments(decidedAt)")
+            }
+        }
+
+        /** Adds repromptCount and repromptCountResetDay to task_states for daily re-prompt cap. */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE task_states ADD COLUMN repromptCount INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE task_states ADD COLUMN repromptCountResetDay TEXT NOT NULL DEFAULT ''")
             }
         }
     }

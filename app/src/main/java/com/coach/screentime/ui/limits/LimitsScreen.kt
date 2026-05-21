@@ -183,7 +183,7 @@ private fun AppLimitCard(a: AppEntity, vm: LimitsViewModel) {
                         .border(1.dp, Rule, RoundedCornerShape(10.dp))
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.Baseline, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
                             a.perAppDailyMinutesCap?.toString() ?: "–",
                             style = CoachType.mono.copy(fontSize = 22.sp),

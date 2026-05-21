@@ -47,7 +47,7 @@ private val DarkScheme = darkColorScheme(
 
 @Composable
 fun ScreenTimeCoachTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,   // design is paper-light only; ignore system dark mode
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(

@@ -102,11 +102,11 @@ class NegotiationViewModel(
             reason = reason,
         )
 
-        val result = geminiClient.generate(systemPrompt, userPrompt)
+        val result = geminiClient.generate(systemPrompt, userPrompt, responseSchema = NEGOTIATION_SCHEMA)
         Log.d("CoachDebug", "raw=${result.getOrNull()} err=${result.exceptionOrNull()?.message}")
         val parsed = result.fold(
             onSuccess = { raw -> parseVerdict(raw) ?: fallback(settings.strictness, settings.extensionMinutes, "Couldn't parse coach response.") },
-            onFailure = { fallback(settings.strictness, settings.extensionMinutes, "Coach unreachable: ${it.message ?: "unknown error"}") },
+            onFailure = { fallback(settings.strictness, settings.extensionMinutes, "Service temporarily unavailable.") },
         )
 
         interventionDao.insertVerdict(
@@ -135,6 +135,17 @@ class NegotiationViewModel(
     }
 
     private companion object {
+        /** JSON Schema enforced for the negotiation/overlay Gemini response. */
+        val NEGOTIATION_SCHEMA = Schema(
+            type = "OBJECT",
+            properties = mapOf(
+                "verdict" to Schema(type = "STRING", enumValues = listOf("accept", "reject")),
+                "extensionMinutes" to Schema(type = "INTEGER"),
+                "explanation" to Schema(type = "STRING"),
+            ),
+            required = listOf("verdict", "extensionMinutes", "explanation"),
+        )
+
         val INJECTION_PATTERNS = listOf(
             Regex("\\b(ignore|disregard|forget|override)\\b.*\\b(previous|prior|all|above|earlier)\\b.*\\b(instruction|prompt|rule|directive)\\b"),
             Regex("\\byou (must|have to|should|need to) (say|answer|respond with|reply|output|return) (accept|yes|grant|approve)"),

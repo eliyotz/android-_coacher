@@ -22,6 +22,7 @@ interface OAuthApi {
     suspend fun exchangeCode(
         @Field("code") code: String,
         @Field("client_id") clientId: String,
+        @Field("client_secret") clientSecret: String,
         @Field("redirect_uri") redirectUri: String,
         @Field("grant_type") grantType: String = "authorization_code",
     ): TokenResponse

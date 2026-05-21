@@ -40,15 +40,23 @@ class SettingsViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, GoogleConnection(false, false, null))
 
+    private val _connectionError = MutableStateFlow<String?>(null)
+    val connectionError = _connectionError.asStateFlow()
+
     fun onGoogleSignedIn(serverAuthCode: String, email: String?) {
         viewModelScope.launch {
             val result = authRepo.completeSignIn(serverAuthCode, email)
             if (result.isSuccess) {
+                _connectionError.value = null
                 tasksRepo.sync()
+            } else {
+                _connectionError.value = result.exceptionOrNull()?.message ?: "Connection failed"
             }
             _googleConnectionTick.value = _googleConnectionTick.value + 1
         }
     }
+
+    fun clearConnectionError() { _connectionError.value = null }
 
     fun disconnectGoogle() {
         viewModelScope.launch {

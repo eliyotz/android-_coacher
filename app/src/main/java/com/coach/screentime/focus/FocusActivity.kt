@@ -25,7 +25,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -131,7 +130,7 @@ private fun FocusScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, Rule),
-                colors = OutlinedButtonDefaults.outlinedButtonColors(contentColor = Ink),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink),
             ) { Text("End focus now", style = CoachType.titleSm) }
         } else {
             // Picker state

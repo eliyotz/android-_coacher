@@ -249,7 +249,7 @@ private fun CategoryRow(c: CategoryRow) {
         Row(
             Modifier.fillMaxWidth().padding(bottom = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Baseline,
+            verticalAlignment = Alignment.Bottom,
         ) {
             Text(c.name, style = CoachType.titleSm, color = Ink)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

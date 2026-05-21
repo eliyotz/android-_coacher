@@ -614,7 +614,7 @@ internal fun TaskCheckReasonOverlay(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Rule),
-                        colors = androidx.compose.material3.OutlinedButtonDefaults.outlinedButtonColors(contentColor = Ink),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink),
                     ) { Text("Cancel", style = CoachType.titleSm) }
                     Button(
                         onClick = { onSubmit(reason.trim()) },

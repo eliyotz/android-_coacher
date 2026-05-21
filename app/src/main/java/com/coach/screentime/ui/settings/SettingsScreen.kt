@@ -153,7 +153,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 private fun GoogleTasksCard(viewModel: SettingsViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val connection by viewModel.googleConnection.collectAsState()
-    val activity = context as? android.app.Activity
+    val connectionError by viewModel.connectionError.collectAsState()
+    // Walk the ContextWrapper chain to find the real Activity
+    fun android.content.Context.findActivity(): android.app.Activity? {
+        var c = this
+        while (c is android.content.ContextWrapper) {
+            if (c is android.app.Activity) return c
+            c = c.baseContext
+        }
+        return null
+    }
+    val activity = context.findActivity()
 
     val signInLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
@@ -203,8 +213,18 @@ private fun GoogleTasksCard(viewModel: SettingsViewModel) {
                     ) { Text("Disconnect") }
                 }
                 else -> {
+                    if (connectionError != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Connection failed: $connectionError",
+                            color = MaterialTheme.colorScheme.error,
+                            fontSize = 12.sp,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                    }
                     androidx.compose.material3.Button(
                         onClick = {
+                            viewModel.clearConnectionError()
                             if (activity == null) return@Button
                             val request = com.google.android.gms.auth.api.identity.AuthorizationRequest.builder()
                                 .setRequestedScopes(

@@ -158,6 +158,8 @@ data class TaskStateEntity(
     val delayedUntilMs: Long,
     val lastJudgmentTs: Long,
     val silenceCheckedAt: Long, // last time silence was evaluated; 0 if never
+    val repromptCount: Int = 0,             // how many re-prompts have fired today (resets daily)
+    val repromptCountResetDay: String = "", // "YYYY-MM-DD" of last reset
 )
 
 @Entity(

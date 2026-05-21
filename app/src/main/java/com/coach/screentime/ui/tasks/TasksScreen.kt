@@ -2,6 +2,7 @@ package com.coach.screentime.ui.tasks
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,14 +19,34 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,12 +57,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.coach.screentime.ui.components.Eyebrow
 import com.coach.screentime.ui.components.Pill
 import com.coach.screentime.ui.components.PunishmentBanner
+import com.coach.screentime.ui.theme.AccentTerracotta
 import com.coach.screentime.ui.theme.Alert
 import com.coach.screentime.ui.theme.Card
+import com.coach.screentime.ui.theme.Card2
 import com.coach.screentime.ui.theme.CoachType
 import com.coach.screentime.ui.theme.Ink
 import com.coach.screentime.ui.theme.Ink2
 import com.coach.screentime.ui.theme.InkMute
+import com.coach.screentime.ui.theme.Paper
 import com.coach.screentime.ui.theme.Rule
 import com.coach.screentime.ui.theme.RuleSoft
 import com.coach.screentime.ui.theme.SageGreen
@@ -49,14 +74,68 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TasksScreen(viewModel: TasksViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsState()
-    when (val s = state) {
-        TasksUiState.Loading -> HelperText("Loading…")
-        TasksUiState.NotConfigured -> HelperText("Google Tasks integration is not configured.\nSet GOOGLE_OAUTH_CLIENT_ID in local.properties and rebuild.")
-        TasksUiState.Disconnected -> HelperText("Connect Google Tasks in Settings to enable task enforcement.")
-        is TasksUiState.Ready -> ReadyContent(s)
+    val sheetTask by viewModel.sheetTask.collectAsState()
+    val coachReply by viewModel.coachReply.collectAsState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Show coach reply as a Snackbar whenever it arrives
+    LaunchedEffect(coachReply) {
+        val reply = coachReply ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(reply)
+        viewModel.clearCoachReply()
+    }
+
+    Scaffold(
+        containerColor = Paper,
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = Ink,
+                    contentColor = Paper,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+        },
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            when (val s = state) {
+                TasksUiState.Loading -> HelperText("Loading…")
+                TasksUiState.NotConfigured -> HelperText("Google Tasks integration is not configured.\nSet GOOGLE_OAUTH_CLIENT_ID in local.properties and rebuild.")
+                TasksUiState.Disconnected -> HelperText("Connect Google Tasks in Settings to enable task enforcement.")
+                is TasksUiState.Ready -> {
+                    val syncing by viewModel.syncing.collectAsState()
+                    ReadyContent(
+                        state = s,
+                        syncing = syncing,
+                        onSyncClick = viewModel::sync,
+                        onTaskTap = { row -> viewModel.openSheet(row) },
+                    )
+                }
+            }
+        }
+    }
+
+    // Bottom sheet: shown whenever a task is tapped (outside Scaffold so it overlays fully)
+    sheetTask?.let { row ->
+        val sheetState = rememberModalBottomSheetState()
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.closeSheet() },
+            sheetState = sheetState,
+            containerColor = Paper,
+        ) {
+            TaskActionSheet(
+                row = row,
+                onMarkWorking = { viewModel.markWorking(row.task.googleId) },
+                onSubmitReason = { reason -> viewModel.submitReason(row.task.googleId, reason) },
+                onDismiss = { viewModel.closeSheet() },
+            )
+        }
     }
 }
 
@@ -68,9 +147,7 @@ private fun HelperText(message: String) {
     ) {
         Text(
             message,
-            style = CoachType.headlineSm.copy(
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-            ),
+            style = CoachType.headlineSm.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
             color = InkMute,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
@@ -78,8 +155,12 @@ private fun HelperText(message: String) {
 }
 
 @Composable
-private fun ReadyContent(state: TasksUiState.Ready) {
-    val now = System.currentTimeMillis()
+private fun ReadyContent(
+    state: TasksUiState.Ready,
+    syncing: Boolean = false,
+    onSyncClick: () -> Unit = {},
+    onTaskTap: (TaskRow) -> Unit = {},
+) {
     val overdue  = state.tasks.filter { it.isOverdue && it.state != "judged_done" }
     val today    = state.tasks.filter { !it.isOverdue && it.task.dueDateMs?.let { d ->
         Instant.ofEpochMilli(d).atZone(ZoneId.systemDefault()).toLocalDate() == LocalDate.now()
@@ -104,18 +185,23 @@ private fun ReadyContent(state: TasksUiState.Ready) {
                     Eyebrow("Tasks · Google", modifier = Modifier.padding(bottom = 4.dp))
                     Text("Open loops.", style = CoachType.headlineMd, color = Ink)
                 }
-                state.email?.let { email ->
-                    Pill(
-                        text = email.take(20),
-                        leading = {
-                            Box(
-                                Modifier
-                                    .size(6.dp)
-                                    .background(SageGreen, RoundedCornerShape(3.dp))
-                            )
-                        },
-                        border = RuleSoft,
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    state.email?.let { email ->
+                        Pill(
+                            text = email.take(20),
+                            leading = {
+                                Box(Modifier.size(6.dp).background(SageGreen, RoundedCornerShape(3.dp)))
+                            },
+                            border = RuleSoft,
+                        )
+                    }
+                    IconButton(onClick = onSyncClick, enabled = !syncing, modifier = Modifier.size(32.dp)) {
+                        if (syncing) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = InkMute)
+                        } else {
+                            Icon(Icons.Filled.Refresh, contentDescription = "Sync tasks", tint = InkMute, modifier = Modifier.size(18.dp))
+                        }
+                    }
                 }
             }
         }
@@ -123,9 +209,7 @@ private fun ReadyContent(state: TasksUiState.Ready) {
         // Punishment banners
         if (state.activePunishments.isNotEmpty()) {
             items(state.activePunishments) { p ->
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    PunishmentBanner(p)
-                }
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) { PunishmentBanner(p) }
             }
         }
 
@@ -138,7 +222,9 @@ private fun ReadyContent(state: TasksUiState.Ready) {
                 }
             }
             items(overdue, key = { it.task.googleId }) { row ->
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 3.dp)) { TaskCard(row) }
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 3.dp)) {
+                    TaskCard(row, onClick = { onTaskTap(row) })
+                }
             }
         }
 
@@ -146,7 +232,9 @@ private fun ReadyContent(state: TasksUiState.Ready) {
         if (today.isNotEmpty()) {
             item { Eyebrow("Today", modifier = Modifier.padding(horizontal = 20.dp).padding(top = 10.dp, bottom = 6.dp)) }
             items(today, key = { it.task.googleId }) { row ->
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 3.dp)) { TaskCard(row) }
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 3.dp)) {
+                    TaskCard(row, onClick = { onTaskTap(row) })
+                }
             }
         }
 
@@ -154,26 +242,26 @@ private fun ReadyContent(state: TasksUiState.Ready) {
         if (upcoming.isNotEmpty()) {
             item { Eyebrow("Upcoming", modifier = Modifier.padding(horizontal = 20.dp).padding(top = 10.dp, bottom = 6.dp)) }
             items(upcoming, key = { it.task.googleId }) { row ->
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 3.dp)) { TaskCard(row) }
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 3.dp)) {
+                    TaskCard(row, onClick = { onTaskTap(row) })
+                }
             }
         }
 
-        // Closed today
+        // Closed
         if (done.isNotEmpty()) {
-            item { Eyebrow("Closed today", modifier = Modifier.padding(horizontal = 20.dp).padding(top = 10.dp, bottom = 6.dp)) }
+            item { Eyebrow("Closed", modifier = Modifier.padding(horizontal = 20.dp).padding(top = 10.dp, bottom = 6.dp)) }
             items(done, key = { it.task.googleId }) { row ->
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 3.dp)) { TaskCard(row) }
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 3.dp)) {
+                    TaskCard(row, onClick = {}) // done tasks are view-only
+                }
             }
         }
 
         if (state.tasks.isEmpty()) {
             item {
                 Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                    Text(
-                        "No open tasks. Add one in Google Tasks.",
-                        style = CoachType.bodyMd,
-                        color = InkMute,
-                    )
+                    Text("No open tasks. Add one in Google Tasks.", style = CoachType.bodyMd, color = InkMute)
                 }
             }
         }
@@ -181,9 +269,11 @@ private fun ReadyContent(state: TasksUiState.Ready) {
 }
 
 @Composable
-private fun TaskCard(row: TaskRow) {
+private fun TaskCard(row: TaskRow, onClick: () -> Unit) {
     val isDone = row.state == "judged_done"
     val stateInfo = stateInfo(row.state)
+    val isDueSoon = !isDone && !row.isOverdue && row.task.dueDateMs != null &&
+        (row.task.dueDateMs - System.currentTimeMillis()) < 6 * 3_600_000L
 
     Row(
         modifier = Modifier
@@ -191,7 +281,8 @@ private fun TaskCard(row: TaskRow) {
             .clip(RoundedCornerShape(14.dp))
             .background(Card)
             .border(1.dp, if (row.isOverdue && !isDone) Alert.copy(alpha = 0.3f) else RuleSoft, RoundedCornerShape(14.dp))
-            .padding(14.dp, 14.dp, 14.dp, 14.dp),
+            .clickable(enabled = !isDone, onClick = onClick)
+            .padding(14.dp),
         verticalAlignment = Alignment.Top,
     ) {
         Checkbox(
@@ -201,7 +292,6 @@ private fun TaskCard(row: TaskRow) {
                 uncheckedColor = if (row.isOverdue) Alert else Rule,
                 checkedColor = SageGreen,
             ),
-            modifier = Modifier.padding(top = 0.dp),
         )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
@@ -218,31 +308,37 @@ private fun TaskCard(row: TaskRow) {
             ) {
                 if (row.isOverdue && !isDone) {
                     Icon(Icons.Filled.Warning, null, tint = Alert, modifier = Modifier.size(11.dp))
+                } else if (isDueSoon) {
+                    Icon(Icons.Filled.AccessTime, null, tint = AccentTerracotta, modifier = Modifier.size(11.dp))
                 }
                 Text(
                     dueDateLabel(row),
                     style = CoachType.mono.copy(fontSize = 12.sp),
-                    color = if (row.isOverdue && !isDone) Alert else InkMute,
+                    color = when {
+                        row.isOverdue && !isDone -> Alert
+                        isDueSoon                -> AccentTerracotta
+                        else                     -> InkMute
+                    },
                 )
                 if (stateInfo.label.isNotBlank()) {
                     Text("· ${stateInfo.label}", style = CoachType.meta, color = stateInfo.color)
                 }
             }
             if (row.task.notes.isNotBlank()) {
-                Text(
-                    row.task.notes,
-                    style = CoachType.meta,
-                    color = Ink2,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
+                Text(row.task.notes, style = CoachType.meta, color = Ink2, modifier = Modifier.padding(top = 6.dp))
             }
-            if (row.grantedDelayCount > 0) {
+            val hasBeenPrompted = row.state !in listOf("untouched", "judged_done")
+            if (row.grantedDelayCount > 0 || hasBeenPrompted) {
+                val chipColor = if (row.grantedDelayCount > 0) WarnGold else InkMute
                 Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("◉", style = CoachType.meta, color = WarnGold)
+                    Text("◉", style = CoachType.meta, color = chipColor)
                     Text(
-                        "Coach granted ${row.grantedDelayCount} delay${if (row.grantedDelayCount > 1) "s" else ""}.",
+                        if (row.grantedDelayCount > 0)
+                            "Coach granted ${row.grantedDelayCount} delay${if (row.grantedDelayCount > 1) "s" else ""}."
+                        else
+                            "0 delays granted.",
                         style = CoachType.meta,
-                        color = WarnGold,
+                        color = chipColor,
                     )
                 }
             }
@@ -250,19 +346,120 @@ private fun TaskCard(row: TaskRow) {
     }
 }
 
+@Composable
+private fun TaskActionSheet(
+    row: TaskRow,
+    onMarkWorking: () -> Unit,
+    onSubmitReason: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var showReasonInput by remember { mutableStateOf(false) }
+    var reason by remember { mutableStateOf("") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(top = 4.dp, bottom = 8.dp)
+            .navigationBarsPadding(),
+    ) {
+        // Task title
+        Eyebrow(dueDateLabel(row), modifier = Modifier.padding(bottom = 4.dp))
+        Text(row.task.title, style = CoachType.headlineSm, color = Ink)
+        if (row.task.notes.isNotBlank()) {
+            Text(row.task.notes, style = CoachType.bodyMd, color = Ink2, modifier = Modifier.padding(top = 4.dp))
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        if (!showReasonInput) {
+            // Primary action
+            Button(
+                onClick = onMarkWorking,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Ink),
+            ) {
+                Text("Yes, I'm doing it now", style = CoachType.titleSm, color = com.coach.screentime.ui.theme.PaperOnDeep)
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // Secondary action
+            OutlinedButton(
+                onClick = { showReasonInput = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Rule),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink),
+            ) {
+                Text("Can't right now — ask coach", style = CoachType.titleSm)
+            }
+        } else {
+            // Reason input
+            Text(
+                "Tell the coach why you can't do this right now.",
+                style = CoachType.bodyMd,
+                color = Ink2,
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = reason,
+                onValueChange = { if (it.length <= 500) reason = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("e.g. I'm in a meeting until 3pm…", style = CoachType.bodyMd, color = InkMute) },
+                textStyle = CoachType.bodyMd,
+                minLines = 3,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AccentTerracotta,
+                    unfocusedBorderColor = Rule,
+                ),
+            )
+            Text(
+                "${reason.length}/500",
+                style = CoachType.meta,
+                color = InkMute,
+                modifier = Modifier.padding(top = 4.dp).align(Alignment.End),
+            )
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = { onSubmitReason(reason.trim()) },
+                enabled = reason.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentTerracotta),
+            ) {
+                Text("Send to coach", style = CoachType.titleSm, color = Card)
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { showReasonInput = false },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Rule),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = InkMute),
+            ) {
+                Text("Back", style = CoachType.titleSm)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
 private data class StateInfo(val label: String, val color: androidx.compose.ui.graphics.Color)
 
 private fun stateInfo(state: String) = when (state) {
-    "working"          -> StateInfo("you're on it", SageGreen)
-    "delayed"          -> StateInfo("delayed by coach", WarnGold)
-    "prompted"         -> StateInfo("waiting on you", Alert)
-    "dismissed_pending"-> StateInfo("punished · still due", Alert)
-    "judged_done"      -> StateInfo("marked done", InkMute)
-    else               -> StateInfo("", InkMute)
+    "working"           -> StateInfo("you're on it", SageGreen)
+    "delayed"           -> StateInfo("delayed by coach", WarnGold)
+    "prompted"          -> StateInfo("waiting on you", Alert)
+    "dismissed_pending" -> StateInfo("punished · still due", Alert)
+    "judged_done"       -> StateInfo("marked done", InkMute)
+    else                -> StateInfo("", InkMute)
 }
 
 private fun dueDateLabel(row: TaskRow): String {
-    val due = row.task.dueDateMs ?: return ""
+    val due = row.task.dueDateMs ?: return "no due date"
     val date = Instant.ofEpochMilli(due).atZone(ZoneId.systemDefault()).toLocalDate()
     val days = (LocalDate.now().toEpochDay() - date.toEpochDay()).toInt()
     return when {

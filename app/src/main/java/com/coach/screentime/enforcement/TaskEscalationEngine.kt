@@ -91,9 +91,9 @@ class TaskEscalationEngine @Inject constructor(
                 TasksRepository.STATE_PROMPTED -> {
                     val sinceMs = now - state.lastPromptedAt
                     if (sinceMs > SILENCE_TIMEOUT_MS && state.silenceCheckedAt < state.lastPromptedAt) {
-                        // User has ignored the prompt long enough — treat as silence.
-                        taskStateDao.upsert(state.copy(silenceCheckedAt = now))
-                        judge(task, state, userReason = "", userResponded = false)
+                        // Atomically claim the silence check — only the first concurrent worker wins.
+                        val claimed = taskStateDao.tryClaimSilenceCheck(task.googleId, now)
+                        if (claimed > 0) judge(task, state, userReason = "", userResponded = false)
                     }
                 }
                 TasksRepository.STATE_WORKING -> {
@@ -110,9 +110,18 @@ class TaskEscalationEngine @Inject constructor(
                     // design.
                     val stillBeingPunished = punishmentManager.activeNow(now)
                         .any { it.taskGoogleId == task.googleId }
-                    val stillOverdue = (task.dueDateMs ?: Long.MAX_VALUE) < now
+                    val stillOverdue = isOverdue(task, now)
                     if (!stillBeingPunished && stillOverdue) {
-                        firePrompt(task, state, followUp = true)
+                        val today = java.time.LocalDate.now().toString()
+                        val countToday = if (state.repromptCountResetDay == today) state.repromptCount else 0
+                        if (countToday < MAX_REPROMPTS_PER_DAY) {
+                            val updatedState = state.copy(
+                                repromptCount = countToday + 1,
+                                repromptCountResetDay = today,
+                            )
+                            taskStateDao.upsert(updatedState)
+                            firePrompt(task, updatedState, followUp = true)
+                        }
                     }
                 }
             }
@@ -121,7 +130,8 @@ class TaskEscalationEngine @Inject constructor(
 
     /** Mark a task done as far as we can tell (next sync may flip it). */
     suspend fun markCompleted(googleId: String) {
-        val state = taskStateDao.byId(googleId) ?: return
+        val now = System.currentTimeMillis()
+        val state = taskStateDao.byId(googleId) ?: defaultState(googleId, now)
         taskStateDao.upsert(state.copy(state = TasksRepository.STATE_JUDGED_DONE))
         cancelTaskNotification(googleId)
     }
@@ -129,7 +139,7 @@ class TaskEscalationEngine @Inject constructor(
     /** User tapped "Yes, I'm doing it" on the prompt. */
     suspend fun markWorking(googleId: String) {
         val now = System.currentTimeMillis()
-        val state = taskStateDao.byId(googleId) ?: return
+        val state = taskStateDao.byId(googleId) ?: defaultState(googleId, now)
         taskStateDao.upsert(
             state.copy(
                 state = TasksRepository.STATE_WORKING,
@@ -139,13 +149,30 @@ class TaskEscalationEngine @Inject constructor(
         cancelTaskNotification(googleId)
     }
 
-    /** User tapped "No, ask the coach". */
-    suspend fun submitReason(googleId: String, reason: String) {
-        val task = taskDao.byId(googleId) ?: return
-        val state = taskStateDao.byId(googleId) ?: return
+    /**
+     * User tapped "No, ask the coach" in the bottom sheet.
+     * Returns the coach's explanation so the UI can show it immediately.
+     */
+    suspend fun submitReason(googleId: String, reason: String): String? {
+        val task = taskDao.byId(googleId) ?: return null
+        val now = System.currentTimeMillis()
+        // A task that was never prompted by the background worker has no state row yet.
+        // Create a default "prompted" state so judge() can proceed.
+        val state = taskStateDao.byId(googleId) ?: defaultState(googleId, now).also { taskStateDao.upsert(it) }
         cancelTaskNotification(googleId)
-        judge(task, state, userReason = reason, userResponded = true)
+        return judge(task, state, userReason = reason, userResponded = true)
     }
+
+    /** Synthesize a first-time state row for a task that was tapped before the engine ever prompted it. */
+    private fun defaultState(googleId: String, now: Long) = TaskStateEntity(
+        googleId = googleId,
+        state = TasksRepository.STATE_PROMPTED,
+        lastPromptedAt = now,
+        workingSinceAt = 0L,
+        delayedUntilMs = 0L,
+        lastJudgmentTs = 0L,
+        silenceCheckedAt = 0L,
+    )
 
     private suspend fun firePrompt(task: TaskEntity, state: TaskStateEntity, followUp: Boolean = false) {
         val now = System.currentTimeMillis()
@@ -186,12 +213,13 @@ class TaskEscalationEngine @Inject constructor(
         nm().notify(taskNotificationId(task.googleId), n)
     }
 
+    /** Returns the coach's explanation text so callers can surface it in the UI. */
     private suspend fun judge(
         task: TaskEntity,
         state: TaskStateEntity,
         userReason: String,
         userResponded: Boolean,
-    ) {
+    ): String {
         val priorDelays = taskDelayDao.forTask(task.googleId)
         val grantedCount = priorDelays.count { it.granted }
         val severityFloor = when {
@@ -214,13 +242,15 @@ class TaskEscalationEngine @Inject constructor(
                 "${r.packageName},${a?.displayName ?: r.packageName},${r.totalSec / 60}"
             }
 
-        val priorDelaysCsv = priorDelays.joinToString("\n") { d ->
+        val recentDelays = priorDelays.take(5) // DAO returns DESC; keep most recent 5
+        val priorDelaysCsv = recentDelays.joinToString("\n") { d ->
             val reason = d.reason.replace("\n", " ").replace(",", ";").take(140)
             "${d.ts},${d.granted},$reason"
-        }
-        val priorJudgmentsCsv = priorDelays
+        }.take(1200)
+        val priorJudgmentsCsv = recentDelays
             .filter { it.aiExplanation.isNotBlank() }
             .joinToString("\n") { it.aiExplanation.replace("\n", " ").replace(",", ";").take(200) }
+            .take(1000)
 
         val daysOverdue = task.dueDateMs?.let {
             val due = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
@@ -245,10 +275,17 @@ class TaskEscalationEngine @Inject constructor(
             strictness = settings.strictness.name,
         )
 
-        val raw = gemini.generate(systemPrompt, userPrompt).getOrNull()
-        val verdict = raw?.let { parseVerdict(it) } ?: deterministicFallback(severityFloor, rollups, apps)
+        val geminiResult = gemini.generate(systemPrompt, userPrompt)
+        if (geminiResult.isFailure) {
+            android.util.Log.e("TaskCoach", "Gemini call failed for task '${task.title}'", geminiResult.exceptionOrNull())
+        }
+        val raw = geminiResult.getOrNull()
+        if (raw != null) android.util.Log.d("TaskCoach", "Gemini raw response: $raw")
+        val parsedVerdict = raw?.let { parseVerdict(it) }
+        val fromFallback = parsedVerdict == null
+        val verdict = parsedVerdict ?: deterministicFallback(severityFloor, rollups, apps)
 
-        applyVerdict(task, state, verdict, userReason)
+        return applyVerdict(task, state, verdict, userReason, fromFallback)
     }
 
     private fun parseVerdict(raw: String): TaskVerdict? {
@@ -277,9 +314,9 @@ class TaskEscalationEngine @Inject constructor(
         val noTargets = targets.isEmpty()
         val forcedFocusMinutes = if (noTargets) (durationH * 60).coerceAtMost(180) else 0
         val explanation = if (noTargets) {
-            "Coach unreachable. Forcing focus mode for ${forcedFocusMinutes} min — all flagged apps locked."
+            "Entering focus mode for ${forcedFocusMinutes} min — all flagged apps locked."
         } else {
-            "Coach unreachable. Default punishment: blocking your top apps for ${durationH}h."
+            "Applying default enforcement: blocking your top apps for ${durationH}h."
         }
         return TaskVerdict(
             decision = "punish",
@@ -296,12 +333,17 @@ class TaskEscalationEngine @Inject constructor(
         )
     }
 
+    /** Applies the verdict, posts the explanation notification, and returns the explanation text. */
     private suspend fun applyVerdict(
         task: TaskEntity,
         state: TaskStateEntity,
         verdict: TaskVerdict,
         userReason: String,
-    ) {
+        fromFallback: Boolean = false,
+    ): String {
+        // If the AI never saw the reason (fallback triggered because Gemini was unreachable),
+        // don't record it — it shouldn't count toward future AI judgment history.
+        val reasonToRecord = if (fromFallback) "" else userReason
         val now = System.currentTimeMillis()
         when (verdict.decision) {
             "allow_delay" -> {
@@ -313,7 +355,7 @@ class TaskEscalationEngine @Inject constructor(
                         ts = now,
                         requestedDelayMs = max(0L, until - now),
                         granted = true,
-                        reason = userReason,
+                        reason = reasonToRecord,
                         aiExplanation = verdict.explanation.take(400),
                     )
                 )
@@ -339,7 +381,7 @@ class TaskEscalationEngine @Inject constructor(
                     taskGoogleId = task.googleId,
                     blockedPackages = p.blockedPackages.orEmpty(),
                     capReductionPct = p.capReductionPct,
-                    focusMinutes = p.focusMinutes,
+                    focusMinutes = p.focusMinutes.coerceIn(0, 240),
                     mindfulPauseMultiplier = p.mindfulPauseMultiplier,
                     durationMs = durationMs,
                     rationale = verdict.explanation,
@@ -351,7 +393,7 @@ class TaskEscalationEngine @Inject constructor(
                         ts = now,
                         requestedDelayMs = 0L,
                         granted = false,
-                        reason = userReason,
+                        reason = reasonToRecord,
                         aiExplanation = verdict.explanation.take(400),
                     )
                 )
@@ -364,6 +406,7 @@ class TaskEscalationEngine @Inject constructor(
                 postExplanationNotification(task, verdict, accepted = false)
             }
         }
+        return verdict.explanation
     }
 
     private fun postExplanationNotification(task: TaskEntity, verdict: TaskVerdict, accepted: Boolean) {
@@ -406,8 +449,12 @@ class TaskEscalationEngine @Inject constructor(
         NotifChannels.NUDGE_NOTIF_ID + 60_000 + googleId.hashCode()
 
     private fun isOverdue(task: TaskEntity, nowMs: Long): Boolean {
-        val due = task.dueDateMs ?: return false
-        return due < nowMs
+        if (task.dueDateMs == null) {
+            // No due date set: treat as overdue after 48 h in the mirror so undated
+            // tasks can't silently bypass enforcement forever.
+            return (nowMs - task.fetchedAt) > 48 * 3_600_000L
+        }
+        return task.dueDateMs < nowMs
     }
 
     @JsonClass(generateAdapter = true)
@@ -434,5 +481,6 @@ class TaskEscalationEngine @Inject constructor(
     private companion object {
         const val SILENCE_TIMEOUT_MS = 15 * 60_000L
         const val FOLLOWUP_MS = 30 * 60_000L
+        const val MAX_REPROMPTS_PER_DAY = 3
     }
 }

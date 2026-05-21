@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import com.coach.screentime.data.db.entities.TaskDelayEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TaskDelayDao {
@@ -15,4 +16,10 @@ interface TaskDelayDao {
 
     @Query("SELECT COUNT(*) FROM task_delays WHERE googleId = :id AND granted = 1")
     suspend fun grantedCountForTask(id: String): Int
+
+    @Query("SELECT googleId, COUNT(*) AS grantCount FROM task_delays WHERE granted = 1 GROUP BY googleId")
+    fun observeGrantedCounts(): Flow<List<TaskGrantCount>>
 }
+
+/** Projection for the batch granted-count query. */
+data class TaskGrantCount(val googleId: String, val grantCount: Int)

@@ -19,7 +19,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -66,7 +65,7 @@ fun InsightsScreen(viewModel: InsightsViewModel = hiltViewModel()) {
                 }
                 OutlinedButton(
                     onClick = { viewModel.runReportNow() },
-                    colors = OutlinedButtonDefaults.outlinedButtonColors(contentColor = Ink),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Ink),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Rule),
                     shape = RoundedCornerShape(999.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 6.dp),
@@ -86,7 +85,7 @@ fun InsightsScreen(viewModel: InsightsViewModel = hiltViewModel()) {
                     .padding(18.dp, 18.dp, 18.dp, 14.dp)
             ) {
                 Column {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Baseline) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
                         Eyebrow("Last 7 days")
                         val weekTotal = state.sevenDayBars.sumOf { it.minutes }
                         Text(
@@ -315,7 +314,7 @@ private fun SevenDayChart(bars: List<DayBar>) {
                     Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Spacer(Modifier.weight(1f - pct.coerceIn(0f, 1f)))
+                    Spacer(Modifier.weight((1f - pct).coerceAtLeast(0.001f)))
                     Box(
                         Modifier.weight(pct.coerceAtLeast(0.02f))
                             .fillMaxWidth()
