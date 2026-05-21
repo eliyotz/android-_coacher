@@ -132,6 +132,7 @@ fun TasksScreen(viewModel: TasksViewModel = hiltViewModel()) {
             TaskActionSheet(
                 row = row,
                 onMarkWorking = { viewModel.markWorking(row.task.googleId) },
+                onMarkCompleted = { viewModel.markCompleted(row.task.googleId) },
                 onSubmitReason = { reason -> viewModel.submitReason(row.task.googleId, reason) },
                 onDismiss = { viewModel.closeSheet() },
             )
@@ -271,9 +272,15 @@ private fun ReadyContent(
 @Composable
 private fun TaskCard(row: TaskRow, onClick: () -> Unit) {
     val isDone = row.state == "judged_done"
-    val stateInfo = stateInfo(row.state)
+    val now = System.currentTimeMillis()
+    val isDelayed = row.state == "delayed" && row.delayedUntilMs > now
+    val stateInfo = if (isDelayed) {
+        StateInfo("delay ends in ${remainingDelayLabel(row.delayedUntilMs - now)}", WarnGold)
+    } else {
+        stateInfo(row.state)
+    }
     val isDueSoon = !isDone && !row.isOverdue && row.task.dueDateMs != null &&
-        (row.task.dueDateMs - System.currentTimeMillis()) < 6 * 3_600_000L
+        (row.task.dueDateMs - now) < 6 * 3_600_000L
 
     Row(
         modifier = Modifier
@@ -350,6 +357,7 @@ private fun TaskCard(row: TaskRow, onClick: () -> Unit) {
 private fun TaskActionSheet(
     row: TaskRow,
     onMarkWorking: () -> Unit,
+    onMarkCompleted: () -> Unit,
     onSubmitReason: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -373,7 +381,7 @@ private fun TaskActionSheet(
         Spacer(Modifier.height(20.dp))
 
         if (!showReasonInput) {
-            // Primary action
+            // Primary action — start working on the task
             Button(
                 onClick = onMarkWorking,
                 modifier = Modifier.fillMaxWidth(),
@@ -385,7 +393,20 @@ private fun TaskActionSheet(
 
             Spacer(Modifier.height(10.dp))
 
-            // Secondary action
+            // Mark as completed — the task is already done
+            OutlinedButton(
+                onClick = onMarkCompleted,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, SageGreen),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = SageGreen),
+            ) {
+                Text("Mark as completed", style = CoachType.titleSm)
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // Escape hatch — ask the coach for a delay
             OutlinedButton(
                 onClick = { showReasonInput = true },
                 modifier = Modifier.fillMaxWidth(),
@@ -456,6 +477,20 @@ private fun stateInfo(state: String) = when (state) {
     "dismissed_pending" -> StateInfo("punished · still due", Alert)
     "judged_done"       -> StateInfo("marked done", InkMute)
     else                -> StateInfo("", InkMute)
+}
+
+/** Formats a positive millisecond duration as "Xd Yh", "Xh Ym", or "Xm". */
+private fun remainingDelayLabel(ms: Long): String {
+    if (ms <= 0L) return "0m"
+    val totalMinutes = (ms / 60_000L).toInt()
+    val days = totalMinutes / (60 * 24)
+    val hours = (totalMinutes % (60 * 24)) / 60
+    val mins = totalMinutes % 60
+    return when {
+        days > 0 -> "${days}d ${hours}h"
+        hours > 0 -> "${hours}h ${mins}m"
+        else -> "${mins}m"
+    }
 }
 
 private fun dueDateLabel(row: TaskRow): String {

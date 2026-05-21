@@ -6,7 +6,7 @@ An AI-powered digital wellbeing app for **personal sideload** use. Designed arou
 2. **Layered intervention.** A 5-second mindfulness pause on every open of a flagged app → AI negotiation when limits are crossed → opt-in Ulysses-contract hard lock for apps you don't trust yourself to negotiate over.
 3. **Per-app + per-category limits.** Stops "whack-a-mole" — capping Instagram alone just pushes you to TikTok. A 90-minute social-media cap covers both.
 
-The AI uses **Google Gemini Flash** (free tier) and is reachable via REST.
+The AI uses **Google Gemini 2.5 Flash** (free tier, `thinkingBudget = 0` for fast JSON output) and is reachable via REST. On 429 / 5xx the client retries 3× with 2s/4s/8s backoff; if it ultimately fails, a deterministic fallback fires so the user never sees a "coach unreachable" dead-end.
 
 > Status: greenfield v1. Builds and runs end-to-end. Phases 1–4 of the plan are implemented (tracking, limits, mindfulness pause, AI negotiation, weekly insights). Phases 5–7 (observe-only onboarding with AI-recommended limits, Ulysses 24h cool-off enforcement, Gemini Nano fallback) are stubbed and noted in the code.
 
@@ -121,10 +121,24 @@ The app can read your Google Tasks and demand answers when something is overdue.
 4. Credentials → Create OAuth client → **Android**:
    - Package: `com.coach.screentime` (or `.debug`)
    - SHA-1: `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android`
-5. Credentials → Create another OAuth client → **Web application** (no redirect URI needed). Use this Web client's ID for `requestServerAuthCode`.
-6. Copy the **Web client ID** into `local.properties` as `GOOGLE_OAUTH_CLIENT_ID=...` and rebuild.
+5. Credentials → Create another OAuth client → **Web application** (no redirect URI needed). Use this Web client's **ID and secret** for the token exchange.
+6. Copy the **Web client ID and secret** into `local.properties` and rebuild:
+   ```
+   GOOGLE_OAUTH_CLIENT_ID=…apps.googleusercontent.com
+   GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-…
+   ```
 
-Open the app → Settings → "Connect Google Tasks". The integration silently no-ops if `GOOGLE_OAUTH_CLIENT_ID` is blank.
+Open the app → Settings → "Connect Google Tasks". If the exchange fails, the error surfaces directly under the button. The integration silently no-ops if `GOOGLE_OAUTH_CLIENT_ID` is blank.
+
+### Tasks tab interactions
+
+Tapping any open task opens a bottom sheet with three options:
+
+- **Yes, I'm doing it now** — moves the task to the `working` state; the engine follows up in 30 minutes if it isn't completed.
+- **Mark as completed** — flips local state to `judged_done` and clears the task from the open list. Google Tasks itself isn't updated (the OAuth scope is `tasks.readonly`); the next sync will reflect whatever is in Google.
+- **Can't right now — ask coach** — opens a reason field; submitting it routes through the AI, which either grants a delay (showing the time remaining on the card, e.g. "delay ends in 2h 15m") or applies a targeted punishment.
+
+The coach's verdict is shown both as a notification and as a Snackbar inside the app.
 
 ## License
 

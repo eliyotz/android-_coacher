@@ -13,9 +13,10 @@ GEMINI_API_KEY=
 #   4. OAuth consent screen → External, Testing → add yourself as test user.
 #      Add scope https://www.googleapis.com/auth/tasks.readonly
 #   5. ALSO create a "Web application" OAuth client (no SHA-1 needed) — used as
-#      the requestServerAuthCode target. Paste THAT client's ID here.
+#      the requestServerAuthCode target. Paste THAT client's ID and secret here.
 # If left blank, the Tasks integration silently no-ops; the rest of the app still works.
 GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
 
 # Path to your Android SDK (Android Studio sets this automatically).
 # sdk.dir=/Users/you/Library/Android/sdk

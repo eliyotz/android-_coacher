@@ -88,6 +88,11 @@ class TasksViewModel @Inject constructor(
         viewModelScope.launch { engine.markWorking(googleId) }
     }
 
+    fun markCompleted(googleId: String) {
+        closeSheet()
+        viewModelScope.launch { engine.markCompleted(googleId) }
+    }
+
     fun submitReason(googleId: String, reason: String) {
         closeSheet()
         viewModelScope.launch {
