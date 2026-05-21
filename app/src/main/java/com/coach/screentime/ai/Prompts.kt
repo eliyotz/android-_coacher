@@ -182,7 +182,7 @@ Respond with a single JSON object and nothing else. No markdown fences.
 {
   "decision": "allow_delay" | "punish",
   "explanation": "addressed to the user, second person, under 240 chars",
-  "delay": { "untilIso": "<ISO-8601 datetime in user's local time>" } | null,
+  "delay": { "untilIso": "<ISO-8601 datetime in user's local time, MUST be in the format YYYY-MM-DDTHH:MM:SS e.g. 2026-05-24T09:00:00>" } | null,
   "punishment": {
     "blockedPackages": ["com.x.android"],
     "capReductionPct": 0,

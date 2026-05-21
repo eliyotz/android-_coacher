@@ -30,7 +30,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -295,6 +297,19 @@ class TaskEscalationEngine @Inject constructor(
         return runCatching { verdictAdapter.fromJson(trimmed) }.getOrNull()
     }
 
+    /**
+     * The AI sometimes returns a fully-qualified Instant ("2026-05-24T09:00:00Z"), sometimes an
+     * offset datetime ("…+03:00"), and sometimes a naive local datetime ("2026-05-24T09:00:00").
+     * Try them in order; naive strings are interpreted in the device's local zone.
+     */
+    private fun parseFlexibleDateTimeMs(iso: String): Long? {
+        runCatching { return Instant.parse(iso).toEpochMilli() }
+        runCatching { return OffsetDateTime.parse(iso).toInstant().toEpochMilli() }
+        runCatching { return ZonedDateTime.parse(iso).toInstant().toEpochMilli() }
+        runCatching { return LocalDateTime.parse(iso).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() }
+        return null
+    }
+
     private fun deterministicFallback(
         severity: String,
         rollups: List<com.coach.screentime.data.db.entities.DailyRollupEntity>,
@@ -347,8 +362,11 @@ class TaskEscalationEngine @Inject constructor(
         val now = System.currentTimeMillis()
         when (verdict.decision) {
             "allow_delay" -> {
-                val until = verdict.delay?.untilIso?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() }
-                    ?: (now + TimeUnit.HOURS.toMillis(4)) // fallback: 4h delay
+                val parsedIso = verdict.delay?.untilIso?.let(::parseFlexibleDateTimeMs)
+                if (verdict.delay?.untilIso != null && parsedIso == null) {
+                    android.util.Log.w("TaskCoach", "Could not parse delay.untilIso='${verdict.delay.untilIso}', falling back to 4h")
+                }
+                val until = parsedIso ?: (now + TimeUnit.HOURS.toMillis(4)) // fallback: 4h delay
                 taskDelayDao.insert(
                     TaskDelayEntity(
                         googleId = task.googleId,
