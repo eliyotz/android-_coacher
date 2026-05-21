@@ -165,7 +165,7 @@ object TaskJudgePrompt {
         return """
 $tone
 
-The user has an overdue Google Task. They either said no to doing it now, or did not respond. Your job: decide whether to grant a delay or punish.
+The user has an overdue Google Task. They either said no to doing it now, did not respond, OR are appealing a punishment you already issued. Your job: decide whether to grant a delay or punish.
 
 Key rules:
 - Use the past delay history. Repeated dismissal of the SAME task is the strongest signal — the user is avoiding it. Each subsequent dismissal must be punished more severely.
@@ -176,6 +176,13 @@ Key rules:
     "light"  → 0 prior granted delays for this task
     "medium" → 1 prior granted delay OR silence
     "harsh"  → 2+ prior granted delays for the same task
+
+APPEAL MODE (when IS_APPEAL: true):
+- The user is currently under an active punishment and is asking you to reconsider.
+- Treat this with a fresh, open mind — they had a punishment and chose to appeal instead of ignoring it; that shows engagement.
+- Focus entirely on whether their NEW argument justifies lifting the punishment and granting the delay.
+- DO NOT punish again if you reject the appeal — they are already being punished. If you reject, keep decision "punish" but set durationHours to 0 and use blockedPackages [] (no new punishment on top). Only grant or maintain the current state.
+- Lower your threshold for granting: if the reason is plausible and not clearly dishonest, grant it.
 
 Respond with a single JSON object and nothing else. No markdown fences.
 
@@ -210,23 +217,41 @@ Exactly one of "delay" or "punishment" must be non-null.
         topAppsCsv: String,
         goal: String,
         strictness: String,
+        isAppeal: Boolean = false,
+        activePunishmentRationale: String = "",
     ): String = buildString {
         appendLine("Time now (local): $nowLocal")
         appendLine("Strictness setting: $strictness")
         if (goal.isNotBlank()) appendLine("User's stated goal: \"$goal\"")
         appendLine()
+        if (isAppeal) {
+            appendLine("IS_APPEAL: true")
+            appendLine("CONTEXT: The user is currently under an active punishment. They are NOT refusing to do the task again — they are appealing your previous rejection. Read their new argument below and decide whether to lift the punishment and grant a delay.")
+            if (activePunishmentRationale.isNotBlank()) {
+                appendLine("Your previous ruling: \"$activePunishmentRationale\"")
+            }
+            appendLine()
+        } else {
+            appendLine("IS_APPEAL: false")
+        }
         appendLine("TASK")
         appendLine("Title: $taskTitle")
         if (taskNotes.isNotBlank()) appendLine("Notes: ${taskNotes.take(280)}")
         appendLine("Originally due: ${dueIso ?: "(no date)"} — $daysOverdue day(s) overdue")
         appendLine()
-        appendLine("USER RESPONDED: $userResponded")
-        if (userResponded) {
-            appendLine("User's reason:")
+        if (isAppeal) {
+            appendLine("USER'S APPEAL ARGUMENT:")
             append("\"\"\""); append(userReason); append("\"\"\"")
             appendLine()
         } else {
-            appendLine("(user ignored the prompt for 15+ minutes)")
+            appendLine("USER RESPONDED: $userResponded")
+            if (userResponded) {
+                appendLine("User's reason:")
+                append("\"\"\""); append(userReason); append("\"\"\"")
+                appendLine()
+            } else {
+                appendLine("(user ignored the prompt for 15+ minutes)")
+            }
         }
         appendLine()
         appendLine("PRIOR DELAYS FOR THIS TASK (timestamp_ms, granted, reason):")

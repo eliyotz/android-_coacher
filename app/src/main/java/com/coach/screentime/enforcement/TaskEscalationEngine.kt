@@ -222,6 +222,7 @@ class TaskEscalationEngine @Inject constructor(
         userReason: String,
         userResponded: Boolean,
     ): String {
+        val now = System.currentTimeMillis()
         val priorDelays = taskDelayDao.forTask(task.googleId)
         val grantedCount = priorDelays.count { it.granted }
         val severityFloor = when {
@@ -229,6 +230,16 @@ class TaskEscalationEngine @Inject constructor(
             grantedCount >= 1 || !userResponded -> "medium"
             else -> "light"
         }
+
+        // Detect appeal: user is in dismissed_pending state AND is actively submitting a reason
+        // (userResponded = true). Pass this context explicitly to the AI so it doesn't treat
+        // the appeal as a brand-new escalating refusal.
+        val isAppeal = state.state == TasksRepository.STATE_DISMISSED_PENDING && userResponded
+        val activePunishments = if (isAppeal) punishmentManager.activeNow(now) else emptyList()
+        val activePunishmentRationale = activePunishments
+            .filter { it.taskGoogleId == task.googleId }
+            .maxByOrNull { it.decidedAt }
+            ?.rationale.orEmpty()
 
         val settings = settingsStore.snapshot()
         val goal = goalDao.activeGoal()?.text.orEmpty()
@@ -261,6 +272,13 @@ class TaskEscalationEngine @Inject constructor(
         val dueIso = task.dueDateMs?.let { Instant.ofEpochMilli(it).toString() }
         val nowLocal = LocalDateTime.now().withSecond(0).withNano(0).toString()
 
+        android.util.Log.d(
+            "TaskCoach",
+            "judge(task='${task.title}', state=${state.state}, isAppeal=$isAppeal, " +
+                "userResponded=$userResponded, priorGranted=$grantedCount, " +
+                "priorDelayRows=${priorDelays.size})",
+        )
+
         val systemPrompt = TaskJudgePrompt.system(settings.strictness)
         val userPrompt = TaskJudgePrompt.user(
             nowLocal = nowLocal,
@@ -275,6 +293,8 @@ class TaskEscalationEngine @Inject constructor(
             topAppsCsv = topApps,
             goal = goal,
             strictness = settings.strictness.name,
+            isAppeal = isAppeal,
+            activePunishmentRationale = activePunishmentRationale,
         )
 
         val geminiResult = gemini.generate(systemPrompt, userPrompt)
