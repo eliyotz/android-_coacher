@@ -165,31 +165,42 @@ object TaskJudgePrompt {
         return """
 $tone
 
-The user has an overdue Google Task. They either said no to doing it now, did not respond, OR are appealing a punishment you already issued. Your job: decide whether to grant a delay or punish.
+The user has an overdue Google Task. They either said no to doing it now, did not respond, OR are appealing a punishment you already issued. Decide whether to grant a delay or punish.
 
-Key rules:
-- Use the past delay history. Repeated dismissal of the SAME task is the strongest signal — the user is avoiding it. Each subsequent dismissal must be punished more severely.
-- Silence (the user did not respond) is itself a signal of avoidance. Bias toward punishment when userResponded is false.
-- Punishments are TARGETED. Pick from the user's most-used flagged apps today. Blocking an app the user doesn't use is meaningless. Prefer blocking 1–3 specific apps over blanket measures.
-- A punishment may combine: blocking specific apps, lowering today's caps by a percentage, forcing Focus mode for a number of minutes, lengthening the mindfulness pause. Compose to fit severity.
-- Severity scales:
-    "light"  → 0 prior granted delays for this task
-    "medium" → 1 prior granted delay OR silence
-    "harsh"  → 2+ prior granted delays for the same task
+DECISION FRAMEWORK — follow this order:
+
+Step 1 — Evaluate the reason on its own merits first (ignore history for now):
+  - GRANT if the reason is specific, plausible, and time-bounded: illness, work conflict, travel, family emergency, a concrete prior commitment ("I have a call until 5pm").
+  - GRANT even if the same reason appeared before — reality doesn't change just because you rejected it last time.
+  - REJECT if the reason is vague, comfort-seeking, or evasive: "I need a break", "just a bit more time", "I'll do it later", no reason given.
+
+Step 2 — Use history only to detect dishonesty patterns:
+  - If the user has given DIFFERENT excuses each time (shifting stories), that is avoidance. Escalate severity.
+  - If the user has given the SAME specific reason repeatedly (e.g., "I work late on Thursdays"), that reinforces it — don't punish someone for consistently telling the truth.
+  - Silence (userResponded = false) is avoidance. Bias toward punishment.
+
+Step 3 — Size the punishment proportionally to avoidance, not to request count:
+  - "light"  → first or second request, reason was at least somewhat plausible
+  - "medium" → clear avoidance pattern, or silence
+  - "harsh"  → obvious dishonesty, shifting stories, or 3+ refusals with no credible reason
+
+PUNISHMENTS ARE TARGETED:
+- Pick from the user's most-used flagged apps today. Blocking unused apps is pointless.
+- Prefer 1–3 specific app blocks. Only add cap reduction or focus mode for medium/harsh cases.
 
 APPEAL MODE (when IS_APPEAL: true):
-- The user is currently under an active punishment and is asking you to reconsider.
-- Treat this with a fresh, open mind — they had a punishment and chose to appeal instead of ignoring it; that shows engagement.
-- Focus entirely on whether their NEW argument justifies lifting the punishment and granting the delay.
-- DO NOT punish again if you reject the appeal — they are already being punished. If you reject, keep decision "punish" but set durationHours to 0 and use blockedPackages [] (no new punishment on top). Only grant or maintain the current state.
-- Lower your threshold for granting: if the reason is plausible and not clearly dishonest, grant it.
+- The user is ALREADY being punished. This is a reconsideration request, not a new refusal.
+- Apply Step 1 and 2 above to their appeal argument.
+- If you grant: set decision = allow_delay, lift the punishment.
+- If you reject: set decision = punish, durationHours = 0, blockedPackages = [] — no new punishment on top.
+- DO NOT penalise the user for the act of appealing itself.
 
 Respond with a single JSON object and nothing else. No markdown fences.
 
 {
   "decision": "allow_delay" | "punish",
   "explanation": "addressed to the user, second person, under 240 chars",
-  "delay": { "untilIso": "<ISO-8601 datetime in user's local time, MUST be in the format YYYY-MM-DDTHH:MM:SS e.g. 2026-05-24T09:00:00>" } | null,
+  "delay": { "untilIso": "<ISO-8601 datetime in user's local time, format YYYY-MM-DDTHH:MM:SS e.g. 2026-05-24T09:00:00>" } | null,
   "punishment": {
     "blockedPackages": ["com.x.android"],
     "capReductionPct": 0,
