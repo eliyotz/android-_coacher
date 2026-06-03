@@ -23,10 +23,7 @@ import com.coach.screentime.intervention.InterventionEngine
 import com.coach.screentime.ui.MainActivity
 import com.coach.screentime.util.Time
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChangedBy
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -42,8 +39,6 @@ class ForegroundAppService : LifecycleService() {
     @Inject lateinit var rollupDao: RollupDao
     @Inject lateinit var settingsStore: SettingsStore
     @Inject lateinit var focusManager: FocusManager
-
-    private var notificationLoop: Job? = null
 
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -70,7 +65,6 @@ class ForegroundAppService : LifecycleService() {
         poller.start()
         observeForegroundAppChanges()
         interventionEngine.start(lifecycleScope)
-        startNotificationRefresh()
     }
 
     private fun observeForegroundAppChanges() {
@@ -80,21 +74,13 @@ class ForegroundAppService : LifecycleService() {
                 .collect { state ->
                     if (state.packageName.isNotBlank()) {
                         sessionAggregator.onForegroundAppChanged(state.packageName, state.ts)
-                        // Refresh immediately on app switch — the user expects feedback to be live.
+                        // Event-driven refresh: update the persistent notification only when the
+                        // foreground app actually changes. This replaces a 30s polling loop that
+                        // woke the process and re-queried the DB ~2,880×/day for no user-visible
+                        // benefit — a meaningful battery win with no loss of accuracy on app switch.
                         refreshNotification()
                     }
                 }
-        }
-    }
-
-    /** Refresh the notification body every 30 seconds with current usage data. */
-    private fun startNotificationRefresh() {
-        notificationLoop?.cancel()
-        notificationLoop = lifecycleScope.launch {
-            while (isActive) {
-                refreshNotification()
-                delay(30_000)
-            }
         }
     }
 
@@ -192,7 +178,6 @@ class ForegroundAppService : LifecycleService() {
 
     override fun onDestroy() {
         runCatching { unregisterReceiver(screenReceiver) }
-        notificationLoop?.cancel()
         poller.stop()
         super.onDestroy()
     }

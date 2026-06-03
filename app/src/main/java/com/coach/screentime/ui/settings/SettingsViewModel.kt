@@ -68,6 +68,16 @@ class SettingsViewModel @Inject constructor(
         SettingsUiState(strictness, mode, pauseSec, extMin, goal?.text.orEmpty())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState.Empty)
 
+    /** Opt-in, default OFF. When off, the coach never blocks apps or forces Focus mode. */
+    val punishmentsEnabled: StateFlow<Boolean> =
+        settingsStore.punishmentsEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Optional AI check-ins, default OFF — the app stays silent unless the user opts in. */
+    val nudgesEnabled: StateFlow<Boolean> =
+        settingsStore.nudgesEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val reflectionEnabled: StateFlow<Boolean> =
+        settingsStore.reflectionEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     private val _exportStatus = MutableStateFlow<ExportStatus>(ExportStatus.Idle)
     val exportStatus: StateFlow<ExportStatus> = _exportStatus.asStateFlow()
 
@@ -75,6 +85,9 @@ class SettingsViewModel @Inject constructor(
     fun setMode(m: Mode) = viewModelScope.launch { settingsStore.setMode(m) }
     fun setPauseSec(s: Int) = viewModelScope.launch { settingsStore.setMindfulPauseSec(s) }
     fun setExtensionMinutes(m: Int) = viewModelScope.launch { settingsStore.setExtensionMinutes(m) }
+    fun setPunishmentsEnabled(enabled: Boolean) = viewModelScope.launch { settingsStore.setPunishmentsEnabled(enabled) }
+    fun setNudgesEnabled(enabled: Boolean) = viewModelScope.launch { settingsStore.setNudgesEnabled(enabled) }
+    fun setReflectionEnabled(enabled: Boolean) = viewModelScope.launch { settingsStore.setReflectionEnabled(enabled) }
     fun setGoal(text: String) = viewModelScope.launch {
         goalDao.deactivateAll()
         if (text.isNotBlank()) {

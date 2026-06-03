@@ -39,6 +39,7 @@ class SettingsStore @Inject constructor(
         val FOCUS_END_TS = longPreferencesKey("focus_end_ts")
         val NUDGES_ENABLED = booleanPreferencesKey("nudges_enabled")
         val REFLECTION_ENABLED = booleanPreferencesKey("reflection_enabled")
+        val PUNISHMENTS_ENABLED = booleanPreferencesKey("punishments_enabled")
     }
 
     val onboarded: Flow<Boolean> = ds.data.map { it[Keys.ONBOARDED] ?: false }
@@ -50,8 +51,12 @@ class SettingsStore @Inject constructor(
     val extensionMinutes: Flow<Int> = ds.data.map { it[Keys.EXTENSION_MINUTES] ?: 15 }
     val userGoal: Flow<String> = ds.data.map { it[Keys.USER_GOAL] ?: "" }
     val focusEndTs: Flow<Long> = ds.data.map { it[Keys.FOCUS_END_TS] ?: 0L }
-    val nudgesEnabled: Flow<Boolean> = ds.data.map { it[Keys.NUDGES_ENABLED] ?: true }
-    val reflectionEnabled: Flow<Boolean> = ds.data.map { it[Keys.REFLECTION_ENABLED] ?: true }
+    // Unobtrusive by default: notification- and AI-driven check-ins are opt-IN, not opt-out.
+    val nudgesEnabled: Flow<Boolean> = ds.data.map { it[Keys.NUDGES_ENABLED] ?: false }
+    val reflectionEnabled: Flow<Boolean> = ds.data.map { it[Keys.REFLECTION_ENABLED] ?: false }
+    // The coach never punishes (block apps / force Focus / shrink caps) unless the user
+    // deliberately turns punishments on. Default off keeps the app a coach, not a warden.
+    val punishmentsEnabled: Flow<Boolean> = ds.data.map { it[Keys.PUNISHMENTS_ENABLED] ?: false }
 
     suspend fun snapshot(): Snapshot {
         val p: Preferences = ds.data.first()
@@ -66,8 +71,9 @@ class SettingsStore @Inject constructor(
             observeStartTs = p[Keys.OBSERVE_START] ?: 0L,
             lastWeeklyReportAt = p[Keys.LAST_WEEKLY_REPORT_AT] ?: 0L,
             focusEndTs = p[Keys.FOCUS_END_TS] ?: 0L,
-            nudgesEnabled = p[Keys.NUDGES_ENABLED] ?: true,
-            reflectionEnabled = p[Keys.REFLECTION_ENABLED] ?: true,
+            nudgesEnabled = p[Keys.NUDGES_ENABLED] ?: false,
+            reflectionEnabled = p[Keys.REFLECTION_ENABLED] ?: false,
+            punishmentsEnabled = p[Keys.PUNISHMENTS_ENABLED] ?: false,
         )
     }
 
@@ -83,6 +89,7 @@ class SettingsStore @Inject constructor(
     suspend fun setFocusEndTs(ts: Long) = ds.edit { it[Keys.FOCUS_END_TS] = ts }
     suspend fun setNudgesEnabled(value: Boolean) = ds.edit { it[Keys.NUDGES_ENABLED] = value }
     suspend fun setReflectionEnabled(value: Boolean) = ds.edit { it[Keys.REFLECTION_ENABLED] = value }
+    suspend fun setPunishmentsEnabled(value: Boolean) = ds.edit { it[Keys.PUNISHMENTS_ENABLED] = value }
 
     data class Snapshot(
         val onboarded: Boolean,
@@ -97,5 +104,6 @@ class SettingsStore @Inject constructor(
         val focusEndTs: Long,
         val nudgesEnabled: Boolean,
         val reflectionEnabled: Boolean,
+        val punishmentsEnabled: Boolean,
     )
 }

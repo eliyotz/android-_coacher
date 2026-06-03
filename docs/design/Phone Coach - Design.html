@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=1320" />
+  <title>Phone Coach — Design</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <style>
+    @keyframes blink { 50% { opacity: 0 } }
+    body { background: #f0eee9; }
+    .ds-caption { font-family: Instrument Serif, Georgia, serif; font-style: italic; color: #34302A; font-size: 17px; line-height: 1.4; max-width: 220px; }
+    .ds-title    { font-family: Instrument Serif, Georgia, serif; font-size: 52px; line-height: 1.05; letter-spacing: -0.01em; color: #1A1916; }
+    .ds-intro    { font-family: Geist, sans-serif; font-size: 14px; color: #34302A; line-height: 1.6; max-width: 620px; }
+    .ds-eyebrow  { text-transform: uppercase; letter-spacing: 0.2em; font-size: 11px; color: #7A7466; font-family: Geist, sans-serif; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="design-system.jsx"></script>
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="android-frame.jsx"></script>
+  <script type="text/babel" src="today.jsx"></script>
+  <script type="text/babel" src="insights.jsx"></script>
+  <script type="text/babel" src="limits.jsx"></script>
+  <script type="text/babel" src="tasks.jsx"></script>
+  <script type="text/babel" src="overlays.jsx"></script>
+  <script type="text/babel" src="app-icon.jsx"></script>
+
+  <script type="text/babel" data-presets="env,react">
+    const { useState } = React;
+
+    // Wrap a screen in a custom Android device frame (no Material chrome —
+    // the design's own header carries the page identity).
+    const Frame = ({ children, width = 360, height = 740, dark = false, statusDark = false }) => (
+      <div style={{
+        width, height,
+        borderRadius: 28,
+        background: dark ? '#14130F' : '#EFE9DC',
+        border: '6px solid #2a2722',
+        boxShadow: '0 24px 60px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(255,255,255,0.04)',
+        overflow: 'hidden',
+        position: 'relative',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        {/* status bar */}
+        <div style={{
+          height: 28,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 16px',
+          color: statusDark ? '#F1ECDE' : '#1A1916',
+          fontFamily: 'Geist Mono, monospace', fontSize: 11,
+          position: 'relative',
+          flexShrink: 0,
+        }}>
+          <span>9:41</span>
+          <div style={{
+            position: 'absolute', left: '50%', top: 8, transform: 'translateX(-50%)',
+            width: 16, height: 16, borderRadius: 100, background: '#14130F',
+          }} />
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+            <svg width="12" height="10" viewBox="0 0 12 10"><path d="M0 10h2V7H0v3zm3 0h2V5H3v5zm3 0h2V3H6v7zm3 0h2V0H9v10z" fill="currentColor"/></svg>
+            <svg width="14" height="10" viewBox="0 0 14 10"><rect x="0.5" y="1" width="11" height="8" rx="1.5" fill="none" stroke="currentColor"/><rect x="12.5" y="3.5" width="1" height="3" fill="currentColor"/><rect x="2" y="2.5" width="8" height="5" rx="0.5" fill="currentColor"/></svg>
+          </div>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          {children}
+        </div>
+        {/* gesture pill */}
+        <div style={{
+          height: 14,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: dark ? '#14130F' : '#EFE9DC',
+          flexShrink: 0,
+        }}>
+          <div style={{ width: 110, height: 4, borderRadius: 2, background: statusDark ? '#F1ECDE' : '#1A1916', opacity: 0.35 }} />
+        </div>
+      </div>
+    );
+
+    // ─────────────────────────────────────────────────────────────
+    // Intro / cover artboard
+    // ─────────────────────────────────────────────────────────────
+    const CoverArt = () => (
+      <div style={{
+        width: 760, height: 480, background: '#EFE9DC',
+        padding: 56, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+        backgroundImage: `radial-gradient(circle at 80% 0%, rgba(194,90,51,0.10), transparent 60%),
+                          radial-gradient(circle at 0% 100%, rgba(110,127,94,0.08), transparent 50%)`,
+      }}>
+        <div className="ds-eyebrow">Phone Coach · Android · design v1</div>
+        <div>
+          <div className="ds-title" style={{ fontStyle: 'italic', maxWidth: 580 }}>
+            A coach, not a curfew.
+          </div>
+          <div className="ds-title" style={{ maxWidth: 600, marginTop: 6 }}>
+            Hi-fi screens for a self-imposed digital wellbeing app.
+          </div>
+          <div className="ds-intro" style={{ marginTop: 22 }}>
+            Six screens, three intervention overlays, one app icon. Type is Instrument Serif (editorial moments)
+            + Geist (UI) + Geist Mono (numbers). Palette is warm paper, ink, terracotta accent, sage as the
+            "you're on track" signal. Built around the existing Compose architecture in <span style={{ fontFamily: 'Geist Mono, monospace' }}>com.coach.screentime.ui.*</span> —
+            see HANDOFF.md for the screen-by-screen Compose notes.
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 28, alignItems: 'flex-end' }}>
+          <PCAppIcon size={128} />
+          <div className="ds-caption">
+            "The hardest moments aren't the limits. They're the ten seconds before."
+            <div style={{ marginTop: 8, fontFamily: 'Geist Mono, monospace', fontSize: 11, fontStyle: 'normal', color: '#7A7466', letterSpacing: 1.2 }}>— THE WEEKLY LETTER</div>
+          </div>
+        </div>
+      </div>
+    );
+
+    // ─────────────────────────────────────────────────────────────
+    // Design-system reference artboards
+    // ─────────────────────────────────────────────────────────────
+    const Swatch = ({ name, hex, fg = '#1A1916' }) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 116 }}>
+        <div style={{ height: 84, borderRadius: 12, background: hex, border: '1px solid rgba(0,0,0,0.06)' }} />
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: fg }}>{name}</div>
+          <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 11, color: '#7A7466' }}>{hex}</div>
+        </div>
+      </div>
+    );
+
+    const PaletteArt = () => (
+      <div style={{ width: 760, height: 480, background: '#FBF7EE', padding: 36, display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <div>
+          <div className="ds-eyebrow">Palette</div>
+          <div style={{ fontFamily: 'Instrument Serif, serif', fontSize: 30, marginTop: 4 }}>Paper, ink, terracotta.</div>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+          <Swatch name="Paper" hex="#EFE9DC" />
+          <Swatch name="Paper 2" hex="#E8E1D0" />
+          <Swatch name="Card" hex="#FBF7EE" />
+          <Swatch name="Card 2" hex="#F5EFE0" />
+          <Swatch name="Ink" hex="#1A1916" />
+          <Swatch name="Ink 2" hex="#34302A" />
+          <Swatch name="Ink mute" hex="#7A7466" />
+          <Swatch name="Rule" hex="#D8D1BD" />
+          <Swatch name="Accent · terracotta" hex="#C25A33" />
+          <Swatch name="Accent 2" hex="#A24923" />
+          <Swatch name="Sage · healthy" hex="#6E7F5E" />
+          <Swatch name="Gold · warn" hex="#C58A2E" />
+          <Swatch name="Alert · lock" hex="#A52E1A" />
+        </div>
+      </div>
+    );
+
+    const TypeArt = () => (
+      <div style={{ width: 760, height: 480, background: '#EFE9DC', padding: 40, display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div>
+          <div className="ds-eyebrow">Type scale</div>
+        </div>
+        <div style={{ borderBottom: '1px solid #D8D1BD', paddingBottom: 14 }}>
+          <div style={{ fontFamily: 'Instrument Serif, serif', fontSize: 56, lineHeight: 1, fontStyle: 'italic' }}>
+            Display · Instrument Serif italic
+          </div>
+          <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 11, color: '#7A7466', marginTop: 6 }}>
+            56 / 60 · weekly letter opening, hero moments
+          </div>
+        </div>
+        <div style={{ borderBottom: '1px solid #D8D1BD', paddingBottom: 14 }}>
+          <div style={{ fontFamily: 'Instrument Serif, serif', fontSize: 32, lineHeight: 1.1 }}>
+            H1 · Instrument Serif 32 — screen titles
+          </div>
+          <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 11, color: '#7A7466', marginTop: 4 }}>
+            32 / 36 · "Morning, Eli.", "Patterns", "What you cap."
+          </div>
+        </div>
+        <div style={{ borderBottom: '1px solid #D8D1BD', paddingBottom: 14 }}>
+          <div style={{ fontFamily: 'Geist, sans-serif', fontSize: 17, fontWeight: 600 }}>H3 · Geist 17 Semibold — section headers, app names</div>
+          <div style={{ fontFamily: 'Geist, sans-serif', fontSize: 14, color: '#34302A', marginTop: 6, lineHeight: 1.55, maxWidth: 580 }}>
+            Body · Geist 14 — descriptive copy, list rows. Line-height 1.5, color Ink 2.
+          </div>
+          <div style={{ fontFamily: 'Geist, sans-serif', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.18em', color: '#7A7466', marginTop: 8, fontWeight: 500 }}>
+            Eyebrow · Geist 10 caps, 0.18em tracking
+          </div>
+          <div style={{ fontFamily: 'Geist Mono, monospace', fontSize: 16, color: '#1A1916', marginTop: 10 }}>
+            Mono · Geist Mono 11–22 — every number on every screen
+          </div>
+        </div>
+      </div>
+    );
+
+    // ─────────────────────────────────────────────────────────────
+    // App icon artboard
+    // ─────────────────────────────────────────────────────────────
+    const AppIconArt = () => (
+      <div style={{ width: 760, height: 540, background: '#EFE9DC', padding: 36, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div>
+          <div className="ds-eyebrow">App icon · adaptive</div>
+          <div style={{ fontFamily: 'Instrument Serif, serif', fontSize: 30, fontStyle: 'italic', marginTop: 4 }}>
+            An eye, watching itself.
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 32, alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <PCAppIcon size={192} />
+            <div className="ds-eyebrow">Primary · launcher</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <PCAppIcon size={108} />
+            <div className="ds-eyebrow">108 dp · launcher</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <PCAppIcon size={108} withGrid />
+            <div className="ds-eyebrow">Safe-zone proof</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <PCAppIconMono size={108} />
+            <div className="ds-eyebrow">Themed icon · mono</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <PCAppIcon size={48} />
+            <div className="ds-eyebrow">48 dp · notification preview</div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 8, fontFamily: 'Geist, sans-serif', fontSize: 13, color: '#34302A', lineHeight: 1.55, maxWidth: 660 }}>
+          The mark is an eye drawn as an almond — the same shape Buddhist iconography uses for
+          "watching" rather than "judging" — with three meditation arcs rising above it like breath.
+          Iris gradient terracotta → maroon (the same accent that fires when limits trigger).
+          Adaptive: foreground sits inside the 66 dp safe circle so Pixel/Samsung/OnePlus masks all crop cleanly.
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 6 }}>
+          <div className="pc-pill" style={{ background: '#FBF7EE' }}><span className="pc-mono">res/mipmap-anydpi-v26/ic_launcher.xml</span></div>
+          <div className="pc-pill" style={{ background: '#FBF7EE' }}><span className="pc-mono">background = paper radial</span></div>
+          <div className="pc-pill" style={{ background: '#FBF7EE' }}><span className="pc-mono">foreground = SVG above</span></div>
+        </div>
+      </div>
+    );
+
+    // ─────────────────────────────────────────────────────────────
+    // Mount everything onto the design canvas
+    // ─────────────────────────────────────────────────────────────
+    const App = () => (
+      <DesignCanvas>
+        <DCSection id="overview" title="Phone Coach" subtitle="Hi-fi reference screens for the Android app">
+          <DCArtboard id="cover" label="Cover" width={760} height={480}><CoverArt /></DCArtboard>
+          <DCArtboard id="palette" label="Palette" width={760} height={480}><PaletteArt /></DCArtboard>
+          <DCArtboard id="type" label="Type" width={760} height={480}><TypeArt /></DCArtboard>
+        </DCSection>
+
+        <DCSection id="icon" title="App icon" subtitle="Adaptive · mono · 48 dp">
+          <DCArtboard id="icon-art" label="Launcher · adaptive" width={760} height={540}><AppIconArt /></DCArtboard>
+        </DCSection>
+
+        <DCSection id="main-tabs" title="Main tabs" subtitle="Bottom-nav screens, default state">
+          <DCArtboard id="today" label="01 Today" width={360} height={780}>
+            <Frame><TodayScreen /></Frame>
+          </DCArtboard>
+          <DCArtboard id="insights" label="02 Insights · weekly letter" width={360} height={780}>
+            <Frame><InsightsScreen /></Frame>
+          </DCArtboard>
+          <DCArtboard id="limits" label="03 Limits · hard lock" width={360} height={780}>
+            <Frame><LimitsScreen /></Frame>
+          </DCArtboard>
+          <DCArtboard id="tasks" label="04 Tasks · Google Tasks" width={360} height={780}>
+            <Frame><TasksScreen /></Frame>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="overlays" title="Interventions" subtitle="The three layers, from gentlest to firmest">
+          <DCArtboard id="pause" label="Layer 1 · Mindfulness pause" width={360} height={780}>
+            <Frame dark statusDark><MindfulnessOverlay /></Frame>
+          </DCArtboard>
+          <DCArtboard id="negotiate-typing" label="Layer 2 · Negotiation · typing" width={360} height={780}>
+            <Frame><NegotiationOverlay phase="typing" /></Frame>
+          </DCArtboard>
+          <DCArtboard id="negotiate-reject" label="Layer 2 · Negotiation · denied" width={360} height={780}>
+            <Frame><NegotiationOverlay phase="reject" /></Frame>
+          </DCArtboard>
+          <DCArtboard id="negotiate-accept" label="Layer 2 · Negotiation · accepted" width={360} height={780}>
+            <Frame><NegotiationOverlay phase="accept" /></Frame>
+          </DCArtboard>
+          <DCArtboard id="hardlock" label="Layer 3 · Hard lock" width={360} height={780}>
+            <Frame dark statusDark><HardLockOverlay /></Frame>
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="focus" title="Focus mode" subtitle="Activity launched from home-screen shortcut or in-app">
+          <DCArtboard id="focus-pick" label="Focus · pick duration" width={360} height={780}>
+            <Frame><FocusModeScreen /></Frame>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+    );
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

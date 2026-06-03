@@ -144,8 +144,72 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             }
         }
 
+        CoachEnforcementCard(viewModel)
+        CheckInsCard(viewModel)
         GoogleTasksCard(viewModel)
         ExportCard(viewModel)
+    }
+}
+
+@Composable
+private fun CoachEnforcementCard(viewModel: SettingsViewModel) {
+    val punishmentsEnabled by viewModel.punishmentsEnabled.collectAsState()
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Coach enforcement", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = !punishmentsEnabled,
+                    onClick = { viewModel.setPunishmentsEnabled(false) },
+                    label = { Text("Coach only") },
+                )
+                FilterChip(
+                    selected = punishmentsEnabled,
+                    onClick = { viewModel.setPunishmentsEnabled(true) },
+                    label = { Text("Allow punishments") },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (punishmentsEnabled)
+                    "When you ignore or decline an overdue task, the coach may block apps, force Focus mode, or shrink today's caps."
+                else
+                    "The coach reminds and reflects, but never blocks apps or forces Focus mode. Overdue tasks get a gentle, dismissible nudge.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CheckInsCard(viewModel: SettingsViewModel) {
+    val nudges by viewModel.nudgesEnabled.collectAsState()
+    val reflection by viewModel.reflectionEnabled.collectAsState()
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Coach check-ins", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Optional, off by default. Occasional AI notifications — leave both off for a silent app.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = nudges,
+                    onClick = { viewModel.setNudgesEnabled(!nudges) },
+                    label = { Text("AI nudges") },
+                )
+                FilterChip(
+                    selected = reflection,
+                    onClick = { viewModel.setReflectionEnabled(!reflection) },
+                    label = { Text("Morning reflection") },
+                )
+            }
+        }
     }
 }
 
@@ -180,7 +244,7 @@ private fun GoogleTasksCard(viewModel: SettingsViewModel) {
             Text("Google Tasks", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "When connected, the coach reads your overdue tasks and prompts you to do them. Saying no or ignoring the prompt summons the AI — it can grant a delay or punish.",
+                "When connected, the coach reads your overdue tasks and sends a gentle, dismissible reminder. Whether it can ever block apps is governed by Coach enforcement above — off by default.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
             )

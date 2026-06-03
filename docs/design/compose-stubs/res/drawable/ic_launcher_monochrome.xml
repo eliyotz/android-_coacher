@@ -1,0 +1,46 @@
+<!-- app/src/main/res/drawable/ic_launcher_monochrome.xml
+     Used by Android 13+ "themed icons". Single-color silhouette;
+     OS tints by the user's wallpaper-derived tone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108"
+    android:tint="?attr/colorControlNormal">
+
+    <!-- almond outline -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:pathData="M26,50 C32,34 76,34 82,50 C76,66 32,66 26,50 Z"/>
+
+    <!-- iris outline -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.2"
+        android:pathData="M54,38 a12,12 0 1 1 0,24 a12,12 0 1 1 0,-24 Z"/>
+
+    <!-- pupil fill -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,46 a4.2,4.2 0 1 1 0,8.4 a4.2,4.2 0 1 1 0,-8.4 Z"/>
+
+    <!-- meditation arcs -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.4"
+        android:strokeAlpha="0.9"
+        android:strokeLineCap="round"
+        android:pathData="M32,32 C42,22 66,22 76,32"/>
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.0"
+        android:strokeAlpha="0.55"
+        android:strokeLineCap="round"
+        android:pathData="M38,26 C46,18 62,18 70,26"/>
+</vector>

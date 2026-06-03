@@ -1,6 +1,5 @@
 package com.coach.screentime.ai
 
-import android.util.Log
 import com.coach.screentime.BuildConfig
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,8 +40,8 @@ class GeminiRestClient @Inject constructor(
             )
             val candidate = resp.candidates?.firstOrNull()
             val parts = candidate?.content?.parts
-            Log.d("CoachDebug", "candidates=${resp.candidates?.size} parts=${parts?.size}")
-            parts?.forEachIndexed { i, p -> Log.d("CoachDebug", "part[$i] text=${p.text}") }
+            // Privacy: never log model output — it echoes the user's personal "reasons"
+            // and app/usage context. Keep prompt/response content off logcat entirely.
             parts?.joinToString("") { it.text.orEmpty() }
                 ?: throw IllegalStateException("Empty response from Gemini")
         }

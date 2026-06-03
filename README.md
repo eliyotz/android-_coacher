@@ -84,6 +84,7 @@ The Gemini key powers four distinct prompts (see `app/src/main/java/com/coach/sc
 
 - **App names + your reasons go to Google.** The app is sideload only, so this is your call. Reasons can be deeply personal — be aware.
 - **GeminiClient is an interface.** Swapping to on-device Gemini Nano (ML Kit GenAI) is a one-file change once you decide to enable it.
+- **Nothing is written to logs.** The Gemini client never logs prompts or model responses to logcat. AI check-ins (nudges, morning reflection) are off by default — opt in under Settings.
 - **No analytics, no Firebase, no telemetry.** All other data stays in Room on-device.
 
 ---
@@ -113,7 +114,7 @@ The Gemini key powers four distinct prompts (see `app/src/main/java/com/coach/sc
 
 ## Google Tasks integration (optional)
 
-The app can read your Google Tasks and demand answers when something is overdue. Saying no or ignoring the prompt summons the AI, which can grant a delay (with memory of past delays) or punish — block specific apps, lower today's caps, force Focus mode. Setup:
+The app can read your Google Tasks and send a **gentle, dismissible** reminder when something is overdue. By default the coach never punishes: ignoring a reminder is respected, and tapping "No — ask coach" simply snoozes the task for a few hours. Punishments (blocking apps, lowering today's caps, forcing Focus mode) are **strictly opt-in** via *Settings → Coach enforcement* — off by default. Setup:
 
 1. `console.cloud.google.com` → new project (or reuse existing).
 2. APIs & Services → Library → enable **Tasks API**.
