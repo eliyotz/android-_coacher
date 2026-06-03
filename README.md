@@ -19,7 +19,7 @@ Requires Android Studio Iguana or newer (AGP 8.5, Kotlin 2.0).
 ```bash
 cp local.properties.example local.properties
 # Open local.properties and fill in:
-#   GEMINI_API_KEY=ya29...    # get one at https://aistudio.google.com — free tier
+#   GEMINI_API_KEY=ya29...    # OPTIONAL — or leave blank and paste it in-app (Settings → Gemini API key)
 #   sdk.dir=/path/to/Android/sdk
 
 ./gradlew :app:assembleDebug
@@ -84,7 +84,8 @@ The Gemini key powers four distinct prompts (see `app/src/main/java/com/coach/sc
 
 - **App names + your reasons go to Google.** The app is sideload only, so this is your call. Reasons can be deeply personal — be aware.
 - **GeminiClient is an interface.** Swapping to on-device Gemini Nano (ML Kit GenAI) is a one-file change once you decide to enable it.
-- **Nothing is written to logs.** The Gemini client never logs prompts or model responses to logcat. AI check-ins (nudges, morning reflection) are off by default — opt in under Settings.
+- **Nothing is written to logs.** Neither the Gemini client nor the HTTP layer logs prompts, responses, or the API key to logcat (OkHttp body logging is off). AI check-ins (nudges, morning reflection) are off by default — opt in under Settings.
+- **The API key need not ship in the APK.** Leave `GEMINI_API_KEY` blank in `local.properties` and paste the key under *Settings → Gemini API key* — it's stored encrypted on-device (EncryptedSharedPreferences), so the secret never reaches the binary.
 - **No analytics, no Firebase, no telemetry.** All other data stays in Room on-device.
 
 ---
@@ -129,4 +130,4 @@ Open the app → Settings → "Connect Google Tasks". The integration silently n
 
 ## License
 
-Personal use. Not for redistribution — the API key is bundled in the APK.
+Personal use. Not for redistribution. Provide your Gemini key at runtime under Settings (stored encrypted on-device) so it never ships in the binary; only a key compiled in via `local.properties` would be bundled in the APK.

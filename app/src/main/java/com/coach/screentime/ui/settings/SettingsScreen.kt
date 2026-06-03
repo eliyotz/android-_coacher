@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -146,6 +147,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
         CoachEnforcementCard(viewModel)
         CheckInsCard(viewModel)
+        GeminiKeyCard(viewModel)
         GoogleTasksCard(viewModel)
         ExportCard(viewModel)
     }
@@ -208,6 +210,60 @@ private fun CheckInsCard(viewModel: SettingsViewModel) {
                     onClick = { viewModel.setReflectionEnabled(!reflection) },
                     label = { Text("Morning reflection") },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GeminiKeyCard(viewModel: SettingsViewModel) {
+    val keyState by viewModel.apiKeyState.collectAsState()
+    var draft by remember { mutableStateOf("") }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Gemini API key", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Stored encrypted on this device — never compiled into the app. Get a free key at aistudio.google.com.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                when {
+                    keyState.hasUserKey -> "A key is saved on this device."
+                    keyState.hasAnyKey -> "Using the build-time key. Save one here to keep it off the binary."
+                    else -> "No key set — AI features are off until you add one."
+                },
+                color = if (keyState.hasAnyKey) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                label = { Text("Paste API key") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.Button(
+                    onClick = {
+                        if (draft.isNotBlank()) {
+                            viewModel.setApiKey(draft)
+                            draft = ""
+                        }
+                    },
+                    enabled = draft.isNotBlank(),
+                ) { Text("Save key") }
+                if (keyState.hasUserKey) {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { viewModel.clearApiKey() },
+                    ) { Text("Remove") }
+                }
             }
         }
     }

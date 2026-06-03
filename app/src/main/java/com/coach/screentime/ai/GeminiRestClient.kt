@@ -1,16 +1,16 @@
 package com.coach.screentime.ai
 
-import com.coach.screentime.BuildConfig
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class GeminiRestClient @Inject constructor(
     private val api: GeminiApi,
+    private val apiKeyStore: ApiKeyStore,
 ) : GeminiClient {
 
     override suspend fun generate(systemPrompt: String, userPrompt: String): Result<String> {
-        val key = BuildConfig.GEMINI_API_KEY
+        val key = apiKeyStore.geminiKey()
         if (key.isBlank()) {
             return Result.failure(IllegalStateException("Gemini API key not configured"))
         }
