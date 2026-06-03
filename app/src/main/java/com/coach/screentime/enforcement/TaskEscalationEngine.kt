@@ -177,9 +177,11 @@ class TaskEscalationEngine @Inject constructor(
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setOngoing(true)
-            .setAutoCancel(false)
+            // Dismissible and normal-priority: a reminder the user can swipe away, not a
+            // sticky high-priority nag engineered to be impossible to ignore.
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setOngoing(false)
+            .setAutoCancel(true)
             .addAction(R.drawable.ic_launcher_foreground, "Yes, doing it", yesIntent)
             .addAction(R.drawable.ic_launcher_foreground, "No — ask coach", noIntent)
             .build()
@@ -192,6 +194,17 @@ class TaskEscalationEngine @Inject constructor(
         userReason: String,
         userResponded: Boolean,
     ) {
+        val settings = settingsStore.snapshot()
+
+        // De-escalated coach: when punishments are off (the default), the coach never blocks
+        // apps, forces Focus mode, or shrinks caps. An explicit "No — ask coach" gets a gentle,
+        // dismissible acknowledgement plus a short snooze; silence is simply respected — no AI
+        // call, no consequence. Ignoring a reminder is the user's right, not a punishable act.
+        if (!settings.punishmentsEnabled) {
+            if (userResponded) softSnooze(task, state, userReason)
+            return
+        }
+
         val priorDelays = taskDelayDao.forTask(task.googleId)
         val grantedCount = priorDelays.count { it.granted }
         val severityFloor = when {
@@ -200,7 +213,6 @@ class TaskEscalationEngine @Inject constructor(
             else -> "light"
         }
 
-        val settings = settingsStore.snapshot()
         val goal = goalDao.activeGoal()?.text.orEmpty()
         val today = Time.todayString()
         val rollups = rollupDao.snapshotForDate(today)
@@ -249,6 +261,41 @@ class TaskEscalationEngine @Inject constructor(
         val verdict = raw?.let { parseVerdict(it) } ?: deterministicFallback(severityFloor, rollups, apps)
 
         applyVerdict(task, state, verdict, userReason)
+    }
+
+    /**
+     * Gentle fallback used when punishments are disabled (the default). The coach
+     * acknowledges the user's "not now," records it for memory, snoozes the task a few
+     * hours, and posts one dismissible reminder — no blocking, no forced Focus, no AI call.
+     */
+    private suspend fun softSnooze(task: TaskEntity, state: TaskStateEntity, userReason: String) {
+        val now = System.currentTimeMillis()
+        taskDelayDao.insert(
+            TaskDelayEntity(
+                googleId = task.googleId,
+                ts = now,
+                requestedDelayMs = SNOOZE_MS,
+                granted = true,
+                reason = userReason,
+                aiExplanation = "",
+            )
+        )
+        taskStateDao.upsert(
+            state.copy(
+                state = TasksRepository.STATE_DELAYED,
+                delayedUntilMs = now + SNOOZE_MS,
+                lastJudgmentTs = now,
+            )
+        )
+        val body = "No problem — I'll check back on \"${task.title}\" later."
+        val n = NotificationCompat.Builder(context, NotifChannels.INTERVENTION)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("Snoozed")
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setAutoCancel(true)
+            .build()
+        nm().notify(NotifChannels.NUDGE_NOTIF_ID + 50_000 + task.googleId.hashCode(), n)
     }
 
     private fun parseVerdict(raw: String): TaskVerdict? {
@@ -434,5 +481,6 @@ class TaskEscalationEngine @Inject constructor(
     private companion object {
         const val SILENCE_TIMEOUT_MS = 15 * 60_000L
         const val FOLLOWUP_MS = 30 * 60_000L
+        const val SNOOZE_MS = 3 * 60 * 60_000L // gentle re-check window when punishments are off
     }
 }

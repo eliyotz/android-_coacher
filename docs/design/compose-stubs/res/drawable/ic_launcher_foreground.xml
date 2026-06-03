@@ -1,0 +1,66 @@
+<!-- app/src/main/res/drawable/ic_launcher_foreground.xml -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- almond eye outer -->
+    <path
+        android:fillColor="#1A1916"
+        android:pathData="M26,50 C32,34 76,34 82,50 C76,66 32,66 26,50 Z"/>
+
+    <!-- iris (terracotta gradient) -->
+    <path android:pathData="M54,38 a12,12 0 1 1 0,24 a12,12 0 1 1 0,-24 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="42" android:startY="38"
+                android:endX="66"   android:endY="62">
+                <item android:offset="0.0" android:color="#C25A33"/>
+                <item android:offset="1.0" android:color="#7A2E14"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- pupil -->
+    <path
+        android:fillColor="#14130F"
+        android:pathData="M54,46 a4.2,4.2 0 1 1 0,8.4 a4.2,4.2 0 1 1 0,-8.4 Z"/>
+
+    <!-- catchlight -->
+    <path
+        android:fillColor="#F5EFE0"
+        android:pathData="M50.6,46.6 a1.7,1.7 0 1 1 0,3.4 a1.7,1.7 0 1 1 0,-3.4 Z"/>
+
+    <!-- upper eyelid stroke -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#1A1916"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:pathData="M27,49 C32,34 76,34 81,49"/>
+
+    <!-- meditation arcs above -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#C25A33"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:pathData="M32,32 C42,22 66,22 76,32"/>
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#C25A33"
+        android:strokeAlpha="0.55"
+        android:strokeWidth="1.0"
+        android:strokeLineCap="round"
+        android:pathData="M38,26 C46,18 62,18 70,26"/>
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#C25A33"
+        android:strokeAlpha="0.30"
+        android:strokeWidth="0.8"
+        android:strokeLineCap="round"
+        android:pathData="M44,21 C50,15 58,15 64,21"/>
+</vector>

@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -144,8 +145,127 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             }
         }
 
+        CoachEnforcementCard(viewModel)
+        CheckInsCard(viewModel)
+        GeminiKeyCard(viewModel)
         GoogleTasksCard(viewModel)
         ExportCard(viewModel)
+    }
+}
+
+@Composable
+private fun CoachEnforcementCard(viewModel: SettingsViewModel) {
+    val punishmentsEnabled by viewModel.punishmentsEnabled.collectAsState()
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Coach enforcement", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = !punishmentsEnabled,
+                    onClick = { viewModel.setPunishmentsEnabled(false) },
+                    label = { Text("Coach only") },
+                )
+                FilterChip(
+                    selected = punishmentsEnabled,
+                    onClick = { viewModel.setPunishmentsEnabled(true) },
+                    label = { Text("Allow punishments") },
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                if (punishmentsEnabled)
+                    "When you ignore or decline an overdue task, the coach may block apps, force Focus mode, or shrink today's caps."
+                else
+                    "The coach reminds and reflects, but never blocks apps or forces Focus mode. Overdue tasks get a gentle, dismissible nudge.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CheckInsCard(viewModel: SettingsViewModel) {
+    val nudges by viewModel.nudgesEnabled.collectAsState()
+    val reflection by viewModel.reflectionEnabled.collectAsState()
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Coach check-ins", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Optional, off by default. Occasional AI notifications — leave both off for a silent app.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = nudges,
+                    onClick = { viewModel.setNudgesEnabled(!nudges) },
+                    label = { Text("AI nudges") },
+                )
+                FilterChip(
+                    selected = reflection,
+                    onClick = { viewModel.setReflectionEnabled(!reflection) },
+                    label = { Text("Morning reflection") },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GeminiKeyCard(viewModel: SettingsViewModel) {
+    val keyState by viewModel.apiKeyState.collectAsState()
+    var draft by remember { mutableStateOf("") }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Gemini API key", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Stored encrypted on this device — never compiled into the app. Get a free key at aistudio.google.com.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                when {
+                    keyState.hasUserKey -> "A key is saved on this device."
+                    keyState.hasAnyKey -> "Using the build-time key. Save one here to keep it off the binary."
+                    else -> "No key set — AI features are off until you add one."
+                },
+                color = if (keyState.hasAnyKey) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = draft,
+                onValueChange = { draft = it },
+                label = { Text("Paste API key") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.Button(
+                    onClick = {
+                        if (draft.isNotBlank()) {
+                            viewModel.setApiKey(draft)
+                            draft = ""
+                        }
+                    },
+                    enabled = draft.isNotBlank(),
+                ) { Text("Save key") }
+                if (keyState.hasUserKey) {
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { viewModel.clearApiKey() },
+                    ) { Text("Remove") }
+                }
+            }
+        }
     }
 }
 
@@ -180,7 +300,7 @@ private fun GoogleTasksCard(viewModel: SettingsViewModel) {
             Text("Google Tasks", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "When connected, the coach reads your overdue tasks and prompts you to do them. Saying no or ignoring the prompt summons the AI — it can grant a delay or punish.",
+                "When connected, the coach reads your overdue tasks and sends a gentle, dismissible reminder. Whether it can ever block apps is governed by Coach enforcement above — off by default.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
             )

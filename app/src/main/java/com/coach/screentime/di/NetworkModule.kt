@@ -31,7 +31,10 @@ object NetworkModule {
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
-        .addInterceptor(HttpLoggingInterceptor { msg -> android.util.Log.d("CoachHttp", msg) }.setLevel(HttpLoggingInterceptor.Level.BODY))
+        // Privacy/security: never log request/response bodies. The Gemini request URL carries
+        // the API key as a query param and the body carries the user's personal prompt — BODY
+        // logging would leak both to logcat. Keep this at NONE.
+        .addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.NONE))
         .build()
 
     @Provides

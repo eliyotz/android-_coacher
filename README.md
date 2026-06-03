@@ -19,7 +19,7 @@ Requires Android Studio Iguana or newer (AGP 8.5, Kotlin 2.0).
 ```bash
 cp local.properties.example local.properties
 # Open local.properties and fill in:
-#   GEMINI_API_KEY=ya29...    # get one at https://aistudio.google.com — free tier
+#   GEMINI_API_KEY=ya29...    # OPTIONAL — or leave blank and paste it in-app (Settings → Gemini API key)
 #   sdk.dir=/path/to/Android/sdk
 
 ./gradlew :app:assembleDebug
@@ -84,6 +84,8 @@ The Gemini key powers four distinct prompts (see `app/src/main/java/com/coach/sc
 
 - **App names + your reasons go to Google.** The app is sideload only, so this is your call. Reasons can be deeply personal — be aware.
 - **GeminiClient is an interface.** Swapping to on-device Gemini Nano (ML Kit GenAI) is a one-file change once you decide to enable it.
+- **Nothing is written to logs.** Neither the Gemini client nor the HTTP layer logs prompts, responses, or the API key to logcat (OkHttp body logging is off). AI check-ins (nudges, morning reflection) are off by default — opt in under Settings.
+- **The API key need not ship in the APK.** Leave `GEMINI_API_KEY` blank in `local.properties` and paste the key under *Settings → Gemini API key* — it's stored encrypted on-device (EncryptedSharedPreferences), so the secret never reaches the binary.
 - **No analytics, no Firebase, no telemetry.** All other data stays in Room on-device.
 
 ---
@@ -113,7 +115,7 @@ The Gemini key powers four distinct prompts (see `app/src/main/java/com/coach/sc
 
 ## Google Tasks integration (optional)
 
-The app can read your Google Tasks and demand answers when something is overdue. Saying no or ignoring the prompt summons the AI, which can grant a delay (with memory of past delays) or punish — block specific apps, lower today's caps, force Focus mode. Setup:
+The app can read your Google Tasks and send a **gentle, dismissible** reminder when something is overdue. By default the coach never punishes: ignoring a reminder is respected, and tapping "No — ask coach" simply snoozes the task for a few hours. Punishments (blocking apps, lowering today's caps, forcing Focus mode) are **strictly opt-in** via *Settings → Coach enforcement* — off by default. Setup:
 
 1. `console.cloud.google.com` → new project (or reuse existing).
 2. APIs & Services → Library → enable **Tasks API**.
@@ -128,4 +130,4 @@ Open the app → Settings → "Connect Google Tasks". The integration silently n
 
 ## License
 
-Personal use. Not for redistribution — the API key is bundled in the APK.
+Personal use. Not for redistribution. Provide your Gemini key at runtime under Settings (stored encrypted on-device) so it never ships in the binary; only a key compiled in via `local.properties` would be bundled in the APK.

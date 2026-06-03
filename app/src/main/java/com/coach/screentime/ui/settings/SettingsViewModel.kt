@@ -8,6 +8,7 @@ import com.coach.screentime.data.db.entities.GoalEntity
 import com.coach.screentime.data.store.Mode
 import com.coach.screentime.data.store.SettingsStore
 import com.coach.screentime.data.store.Strictness
+import com.coach.screentime.ai.ApiKeyStore
 import com.coach.screentime.auth.GoogleAuthRepository
 import com.coach.screentime.export.JsonExporter
 import com.coach.screentime.tasks.TasksRepository
@@ -29,6 +30,7 @@ class SettingsViewModel @Inject constructor(
     private val jsonExporter: JsonExporter,
     private val authRepo: GoogleAuthRepository,
     private val tasksRepo: TasksRepository,
+    private val apiKeyStore: ApiKeyStore,
 ) : ViewModel() {
 
     private val _googleConnectionTick = MutableStateFlow(0)
@@ -68,6 +70,21 @@ class SettingsViewModel @Inject constructor(
         SettingsUiState(strictness, mode, pauseSec, extMin, goal?.text.orEmpty())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState.Empty)
 
+    /** Opt-in, default OFF. When off, the coach never blocks apps or forces Focus mode. */
+    val punishmentsEnabled: StateFlow<Boolean> =
+        settingsStore.punishmentsEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Optional AI check-ins, default OFF — the app stays silent unless the user opts in. */
+    val nudgesEnabled: StateFlow<Boolean> =
+        settingsStore.nudgesEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    val reflectionEnabled: StateFlow<Boolean> =
+        settingsStore.reflectionEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    private val _apiKeyTick = MutableStateFlow(0)
+    val apiKeyState: StateFlow<ApiKeyState> = _apiKeyTick.map {
+        ApiKeyState(hasUserKey = apiKeyStore.hasUserKey(), hasAnyKey = apiKeyStore.hasGeminiKey())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, ApiKeyState(hasUserKey = false, hasAnyKey = false))
+
     private val _exportStatus = MutableStateFlow<ExportStatus>(ExportStatus.Idle)
     val exportStatus: StateFlow<ExportStatus> = _exportStatus.asStateFlow()
 
@@ -75,6 +92,19 @@ class SettingsViewModel @Inject constructor(
     fun setMode(m: Mode) = viewModelScope.launch { settingsStore.setMode(m) }
     fun setPauseSec(s: Int) = viewModelScope.launch { settingsStore.setMindfulPauseSec(s) }
     fun setExtensionMinutes(m: Int) = viewModelScope.launch { settingsStore.setExtensionMinutes(m) }
+    fun setPunishmentsEnabled(enabled: Boolean) = viewModelScope.launch { settingsStore.setPunishmentsEnabled(enabled) }
+    fun setNudgesEnabled(enabled: Boolean) = viewModelScope.launch { settingsStore.setNudgesEnabled(enabled) }
+    fun setReflectionEnabled(enabled: Boolean) = viewModelScope.launch { settingsStore.setReflectionEnabled(enabled) }
+
+    fun setApiKey(value: String) = viewModelScope.launch {
+        apiKeyStore.setGeminiKey(value)
+        _apiKeyTick.value = _apiKeyTick.value + 1
+    }
+
+    fun clearApiKey() = viewModelScope.launch {
+        apiKeyStore.clearGeminiKey()
+        _apiKeyTick.value = _apiKeyTick.value + 1
+    }
     fun setGoal(text: String) = viewModelScope.launch {
         goalDao.deactivateAll()
         if (text.isNotBlank()) {
@@ -119,4 +149,9 @@ data class GoogleConnection(
     val configured: Boolean,
     val connected: Boolean,
     val email: String?,
+)
+
+data class ApiKeyState(
+    val hasUserKey: Boolean,
+    val hasAnyKey: Boolean,
 )

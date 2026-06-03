@@ -1,6 +1,5 @@
 package com.coach.screentime.ai
 
-import android.util.Log
 import com.coach.screentime.data.db.dao.AppDao
 import com.coach.screentime.data.db.dao.CategoryDao
 import com.coach.screentime.data.db.dao.GoalDao
@@ -103,7 +102,8 @@ class NegotiationViewModel(
         )
 
         val result = geminiClient.generate(systemPrompt, userPrompt)
-        Log.d("CoachDebug", "raw=${result.getOrNull()} err=${result.exceptionOrNull()?.message}")
+        // Privacy: never log raw model output — it carries the user's negotiation reason and
+        // the coach's verdict. Parse-failures fall back gracefully without logging content.
         val parsed = result.fold(
             onSuccess = { raw -> parseVerdict(raw) ?: fallback(settings.strictness, settings.extensionMinutes, "Couldn't parse coach response.") },
             onFailure = { fallback(settings.strictness, settings.extensionMinutes, "Coach unreachable: ${it.message ?: "unknown error"}") },
